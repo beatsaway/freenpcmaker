@@ -1,0 +1,319 @@
+/**
+ * AvatarConfig — declarative NPC appearance.
+ * All fields optional; missing ones fall back to DEFAULT_CONFIG.
+ */
+
+/** @deprecated unused — kept so old imports don't break */
+export const GENDERS = [];
+export const BODY_SHAPES = ["slim", "regular", "stocky"];
+export const EYE_STYLES = ["oval", "almond", "wide"];
+export const EYE_SCALE_MIN = 0.6;
+export const EYE_SCALE_MAX = 2.8; // doubled from 1.4
+export const EYE_DISTANCE_MIN = 0.45;
+export const EYE_DISTANCE_MAX = 3.6;
+/** Half-spread at eyeDistance=1 when hw=0.34 (matches Head placement). */
+const EYE_SPREAD_AT_1 = 0.055;
+/** Approx half-width of an eye at scale=1 (used for overlap limits). */
+const EYE_HALF_AT_1 = 0.038;
+/** Max eye X as a fraction of skull width — keeps eyes on the front face. */
+const EYE_MAX_X_FRAC = 0.34;
+
+/** Center offset of one eye from midline. */
+export function eyeHalfSpread(eyeDistance = 1, hw = 0.34) {
+  const dist = Math.min(EYE_DISTANCE_MAX, Math.max(EYE_DISTANCE_MIN, Number(eyeDistance) || 1));
+  return EYE_SPREAD_AT_1 * ((hw || 0.34) / 0.34) * dist;
+}
+
+/**
+ * Max eyeDistance so eyes stay on the front of the face (not wrapping to the side/back).
+ * Pass faceOpts ({ hw, hh, hd, headY, roundness }) to tighten via SDF front surface.
+ */
+export function maxEyeDistanceForWidth(hw = 0.34, faceOpts = null) {
+  const w = hw || 0.34;
+  const base = EYE_SPREAD_AT_1 * (w / 0.34);
+  if (base < 1e-8) return EYE_DISTANCE_MIN;
+
+  let maxX = w * EYE_MAX_X_FRAC;
+
+  if (faceOpts && faceOpts.hh != null) {
+    // Lazy import avoided — inline front-Z probe via optional callback on faceOpts
+    const probe = faceOpts.frontZ;
+    if (typeof probe === "function") {
+      const hd = faceOpts.hd ?? 0.18;
+      const headY = faceOpts.headY ?? 0;
+      const hh = faceOpts.hh ?? 0.16;
+      const y = headY + hh * 0.08;
+      const midZ = probe(0, y);
+      const minFrontZ = Math.max(hd * 0.12, midZ * 0.55);
+      let lo = 0;
+      let hi = Math.min(w * 0.48, maxX * 1.2);
+      for (let i = 0; i < 16; i++) {
+        const mid = (lo + hi) * 0.5;
+        if (probe(mid, y) >= minFrontZ) lo = mid;
+        else hi = mid;
+      }
+      maxX = Math.min(maxX, lo);
+    }
+  }
+
+  return Math.min(EYE_DISTANCE_MAX, Math.max(EYE_DISTANCE_MIN, maxX / base));
+}
+
+/** Clamp eyeDistance to the front-face max for this skull width. */
+export function clampEyeDistance(eyeDistance, hw = 0.34, faceOpts = null) {
+  const hi = maxEyeDistanceForWidth(hw, faceOpts);
+  const v = Number(eyeDistance);
+  if (!Number.isFinite(v)) return Math.min(1, hi);
+  return Math.min(hi, Math.max(EYE_DISTANCE_MIN, v));
+}
+
+/**
+ * Max eye scale so left/right eyes don't overlap for a given eyeDistance.
+ * Closer eyes → lower max scale.
+ */
+export function maxEyeScaleForDistance(eyeDistance = 1, hw = 0.34) {
+  const dist = Math.min(EYE_DISTANCE_MAX, Math.max(EYE_DISTANCE_MIN, Number(eyeDistance) || 1));
+  const baseSpread = eyeHalfSpread(dist, hw);
+  const gap = 0.012; // min clear space between inner edges
+  const maxFromDist = (2 * baseSpread - gap) / (2 * EYE_HALF_AT_1);
+  return Math.min(EYE_SCALE_MAX, Math.max(EYE_SCALE_MIN, maxFromDist));
+}
+
+export function clampEyeScale(scale, eyeDistance = 1, hw = 0.34) {
+  const lo = EYE_SCALE_MIN;
+  const hi = maxEyeScaleForDistance(eyeDistance, hw);
+  const v = Number(scale);
+  if (!Number.isFinite(v)) return Math.min(1, hi);
+  return Math.min(hi, Math.max(lo, v));
+}
+
+/** Head size (height.head) — min doubled from 0.5, max +30% from 1.7. */
+export const HEAD_SCALE_MIN = 1.0;
+export const HEAD_SCALE_MAX = 2.21;
+
+export const BROW_STYLES = ["straight", "arched", "thick", "thin", "short", "angled", "none"];
+export const NOSE_STYLES = [
+  "button",
+  "bridge",
+  "flat",
+  "pointy",
+  "bulbous",
+  "hooked",
+  "snub",
+  "hawk",
+  "broad",
+  "petite",
+  "slope",
+];
+export const EAR_STYLES = [
+  "round",
+  "point",
+  "wide",
+  "lobe",
+  "elf",
+  "floppy",
+  "small",
+  "cupped",
+  "square",
+  "wing",
+];
+/** Short / cropped looks (~half of random picks). */
+export const HAIR_SHORT = ["bald", "short", "buzz", "crew", "messy"];
+/** Longer looks (~half of random picks). */
+export const HAIR_LONG = [
+  "bob",
+  "ponytail",
+  "bun",
+  "long",
+  "afro",
+  "twin-tails",
+  "braid",
+  "wavy",
+  "shoulder",
+  "pigtails",
+];
+export const HAIR_STYLES = [...HAIR_SHORT, ...HAIR_LONG];
+export const HAT_STYLES = ["none", "cap", "beanie", "visor", "hardhat", "bowler", "sunhat", "roundcap"];
+export const TOP_STYLES = ["tee", "polo", "hoodie", "jacket", "overalls"];
+export const BOTTOM_STYLES = ["pants", "shorts", "mini-shorts", "mini-skirt"];
+export const SHOE_STYLES = ["sneaker", "boot", "slippers", "loafer", "hi-top"];
+export const PATTERN_TYPES = [
+  "solid",
+  "stripes",
+  "stripes-v",
+  "stripes-thin",
+  "stripes-h",
+  "dots",
+  "polka",
+  "checkers",
+  "grid",
+  "crosshatch",
+  "diagonal",
+  "chevron",
+  "zigzag",
+  "diamonds",
+  "triangles",
+  "waves",
+  "speckles",
+  "argyle",
+  "herringbone",
+  "plaid",
+  "bricks",
+  "stars",
+  "rings",
+];
+
+const SOLID_PATTERN = Object.freeze({
+  type: "solid",
+  color2: 0xffffff,
+  scale: 1,
+  rotation: 0,
+  opacity: 0.85,
+});
+
+export const DEFAULT_CONFIG = Object.freeze({
+  skinTone: 0xedc9a8,
+  bodyShape: "regular",
+  scale: 1,
+  height: { leg: 1, torso: 1, neck: 1, head: 1 },
+  body: { hipThick: 1, armThick: 1, legThick: 1 },
+  face: { eyeDistance: 1, roundness: 1, length: 1, width: 1 },
+  eyes: { style: "oval", color: 0x2a3a4a, scale: 1 },
+  brows: { style: "straight", scale: 1 },
+  nose: { style: "button", scale: 1 },
+  ears: { style: "round", scale: 1 },
+  hair: { style: "bob", color: 0x3a2a1a },
+  hat: { style: "none", color: 0x3d8f6e },
+  clothes: {
+    top: {
+      style: "tee",
+      color: 0x3d8f6e,
+      pattern: { ...SOLID_PATTERN },
+    },
+    bottom: {
+      style: "pants",
+      color: 0x3a4550,
+      pattern: { ...SOLID_PATTERN, color2: 0x222222 },
+    },
+    shoes: {
+      style: "sneaker",
+      color: 0x2a2a32,
+      pattern: { ...SOLID_PATTERN, color2: 0x555555 },
+    },
+  },
+});
+
+export function deepMerge(base, patch) {
+  if (!patch) return structuredClone(base);
+  const out = structuredClone(base);
+  for (const [k, v] of Object.entries(patch)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      out[k] = deepMerge(out[k] ?? {}, v);
+    } else if (v !== undefined) {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+export function resolveConfig(partial = {}) {
+  const cfg = deepMerge(DEFAULT_CONFIG, partial);
+  if (cfg.eyes?.style === "dot") cfg.eyes.style = "oval";
+  if (cfg.clothes?.shoes?.style === "sandal") cfg.clothes.shoes.style = "slippers";
+  if (cfg.clothes?.top?.style === "tank") cfg.clothes.top.style = "overalls";
+  delete cfg.gender;
+  if (cfg.face) {
+    cfg.face.eyeDistance = clampEyeDistance(cfg.face.eyeDistance);
+  }
+  if (cfg.eyes) {
+    cfg.eyes.scale = clampEyeScale(cfg.eyes.scale, cfg.face?.eyeDistance);
+  }
+  return cfg;
+}
+
+/** ~50% patterned, else solid. Includes scale + rotation + opacity variation. */
+export function randomPattern(rnd, hex) {
+  if (rnd() > 0.5) {
+    return {
+      type: "solid",
+      color2: hex(),
+      scale: 1,
+      rotation: 0,
+      opacity: 0.85,
+    };
+  }
+  const types = PATTERN_TYPES.filter((t) => t !== "solid");
+  return {
+    type: types[Math.floor(rnd() * types.length)],
+    color2: hex(),
+    scale: 0.4 + rnd() * 2.0,
+    rotation: rnd() * 180,
+    opacity: 0.2 + rnd() * 0.8,
+  };
+}
+
+export function randomConfig(seed = Math.random()) {
+  let s = typeof seed === "string"
+    ? [...seed].reduce((a, c) => a + c.charCodeAt(0), 0)
+    : Number(seed) || 1;
+  const rnd = () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+  const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
+  const hex = () => Math.floor(rnd() * 0xffffff);
+
+  // ~50/50 short vs long hair (presentation cue, not a gender flag)
+  const hairPool = rnd() < 0.5 ? HAIR_SHORT : HAIR_LONG;
+
+  return resolveConfig({
+    skinTone: pick([0xf0d5b8, 0xedc9a8, 0xd4a574, 0xa67c52, 0x8d5524, 0x5c3a21]),
+    bodyShape: pick(BODY_SHAPES),
+    height: {
+      leg: 0.55 + rnd() * 0.9,
+      torso: 0.55 + rnd() * 0.9,
+      neck: 0.55 + rnd() * 0.9,
+      head: HEAD_SCALE_MIN + rnd() * (HEAD_SCALE_MAX - HEAD_SCALE_MIN),
+    },
+    face: {
+      // Full slider ranges (same mins/maxes as the Face panel)
+      eyeDistance: 0.45 + rnd() * (2.1 - 0.45),
+      roundness: 0.45 + rnd() * (1.25 - 0.45),
+      length: 0.65 + rnd() * (2 - 0.65),
+      width: 0.75 + rnd() * (1.35 - 0.75),
+    },
+    body: {
+      hipThick: 0.95 + rnd() * 1.1,
+      armThick: 0.7 + rnd() * 0.9,
+      legThick: 0.7 + rnd() * 0.9,
+    },
+    eyes: {
+      style: pick(EYE_STYLES),
+      color: pick([0x2a3a4a, 0x3a5a2a, 0x4a6a9a, 0x5a3a2a]),
+      scale: 0.7 + rnd() * 1.5,
+    },
+    brows: { style: pick(BROW_STYLES), scale: 0.85 + rnd() * 0.3 },
+    nose: { style: pick(NOSE_STYLES), scale: 0.85 + rnd() * 0.35 },
+    ears: { style: pick(EAR_STYLES), scale: 0.95 + rnd() * 0.25 },
+    hair: { style: pick(hairPool), color: pick([0x1a1a1a, 0x3a2a1a, 0x6a4a2a, 0xc4a35a, 0x8a2a2a, 0x4a4a5a]) },
+    hat: { style: rnd() > 0.7 ? pick(HAT_STYLES.filter((h) => h !== "none")) : "none", color: hex() },
+    clothes: {
+      top: {
+        style: pick(TOP_STYLES),
+        color: hex(),
+        pattern: randomPattern(rnd, hex),
+        buttons: 2 + Math.floor(rnd() * 4), // 2–5 (used by polo / jacket)
+      },
+      bottom: {
+        style: pick(BOTTOM_STYLES),
+        color: hex(),
+        pattern: randomPattern(rnd, hex),
+      },
+      shoes: {
+        style: pick(SHOE_STYLES),
+        color: pick([0x1a1a1a, 0x2a2a32, 0x4a3020, 0xffffff, 0x8a3030, 0x3d8f6e]),
+        pattern: randomPattern(rnd, hex),
+      },
+    },
+  });
+}
