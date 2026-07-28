@@ -8,14 +8,14 @@ export default defineConfig({
   server: {
     host: true,
     port: 8770,
-    open: "/demo/index.html",
+    open: "/index.html",
   },
   build: {
     outDir: "dist",
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        demo: resolve(__dirname, "demo/index.html"),
+        main: resolve(__dirname, "index.html"),
       },
     },
   },

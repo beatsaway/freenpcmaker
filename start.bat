@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 set PORT=8770
-set URL=http://127.0.0.1:%PORT%/demo/index.html
+set URL=http://127.0.0.1:%PORT%/
 
 echo.
 echo === Free NPC Maker ===

@@ -9,7 +9,11 @@ npm install
 npm run dev
 ```
 
-Or on Windows: double-click `start.bat` (opens http://127.0.0.1:8770/demo/index.html).
+Or on Windows: double-click `start.bat` (opens http://127.0.0.1:8770/).
+
+## Deploy (Netlify)
+
+Connect the GitHub repo — `netlify.toml` builds with `npm run build` and publishes `dist/` (root `index.html`).
 
 ## Credits
 
