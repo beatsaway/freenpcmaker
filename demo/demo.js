@@ -77,7 +77,8 @@ renderer.shadowMap.type = THREE.PCFShadowMap; // soft base → ink threshold (no
 renderer.shadowMap.autoUpdate = false; // only redraw on hand frames (12fps)
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xffffff);
+// Warm animation-paper yellow (classic lightbox / sketch tone)
+scene.background = new THREE.Color(0xf3e2a0);
 
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 40);
 camera.position.set(0, 1.35, 3.4);
@@ -100,8 +101,8 @@ function followAvatarCenter() {
 }
 
 /** Solid white ground — shadow is the visual; no soft rim fade. */
-scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-scene.add(new THREE.HemisphereLight(0xffffff, 0xe8e8ec, 0.25));
+scene.add(new THREE.AmbientLight(0xfff6e0, 0.55));
+scene.add(new THREE.HemisphereLight(0xfff4d6, 0xe8d090, 0.25));
 const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
 keyLight.position.set(2.4, 4.2, 3.2);
 keyLight.castShadow = true;
