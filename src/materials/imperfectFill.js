@@ -51,7 +51,7 @@ export function applyImperfectFill(mat) {
          float jx = fract(sin(draw * 12.9898 + 1.3) * 43758.5453) - 0.5;
          float jy = fract(sin(draw * 78.233 + 8.1) * 43758.5453) - 0.5;
          float jz = fract(sin(draw * 45.164 + 3.7) * 19234.67) - 0.5;
-         transformed += vec3(jx, jy * 0.55, jz) * 0.0032;
+         transformed += vec3(jx, jy * 0.55, jz) * 0.0075;
        }
       `
     );
@@ -78,6 +78,6 @@ export function applyImperfectFill(mat) {
        #include <opaque_fragment>`
     );
   };
-  mat.customProgramCacheKey = () => "imperfect-hand-fill-v3-blot";
+  mat.customProgramCacheKey = () => "imperfect-hand-fill-v3-blot-up";
   return mat;
 }
