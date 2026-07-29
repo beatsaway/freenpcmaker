@@ -1,11 +1,14 @@
 /**
- * Mesh outline via inverted hull — thickness wobbles like a hand-drawn stroke.
+ * Mesh outline via inverted hull — thickness snaps every hand-drawn frame (~12fps).
  */
 import * as THREE from "three";
 
+/** Limited animation rate — like drawing on twos at 24fps. */
+export const HAND_FPS = 12;
+
 const VERT = /* glsl */ `
 uniform float uExpand;
-uniform float uTime;
+uniform float uFrame;
 #include <common>
 #include <skinning_pars_vertex>
 void main() {
@@ -15,18 +18,32 @@ void main() {
   #include <defaultnormal_vertex>
   #include <begin_vertex>
   #include <skinning_vertex>
-  // Calligraphic pressure: wide thin↔thick swings + sharp stress peaks
+  // Discrete drawing index — same snap family as shadow shake
+  float draw = floor(uFrame);
+  float f = draw * 0.28;
   vec3 p = transformed;
   float pressure =
-    0.50 * sin(p.y * 18.0 + p.x * 7.0 + uTime * 0.55) +
-    0.35 * sin(p.x * 27.0 - p.z * 12.0 - uTime * 0.4) +
-    0.28 * sin((p.y * 1.4 + p.z) * 41.0 + uTime * 0.75) +
-    0.18 * sin(dot(p, vec3(9.0, 23.0, 5.0)) + uTime * 1.1);
-  // Emphasize extremes (calligraphy “press / lift”)
+    0.55 * sin(p.y * 14.0 + p.x * 6.0 + f * 1.1) +
+    0.40 * sin(p.x * 22.0 - p.z * 9.0 - f * 0.85) +
+    0.30 * sin((p.y * 1.3 + p.z) * 35.0 + f * 1.35) +
+    0.22 * sin(dot(p, vec3(9.0, 23.0, 5.0)) + f * 1.6);
   pressure = pressure / (1.0 + abs(pressure));
-  float stress = pow(max(0.0, sin(p.y * 9.0 + p.x * 5.0 + uTime * 0.3)), 4.0);
-  float thick = mix(0.12, 1.85, 0.5 + 0.5 * pressure) + stress * 0.7;
+  float stress = pow(max(0.0, sin(p.y * 8.0 + p.x * 4.0 + f * 0.7)), 3.5);
+  float jump = fract(sin(floor(draw * 0.35) * 12.9898 + p.y * 4.0) * 43758.5453);
+  // Thin end is hairline; thick stays heavy — bigger calligraphic swing
+  float thick = mix(0.06, 1.95, 0.5 + 0.5 * pressure) + stress * 0.55;
+  thick *= mix(0.45, 1.35, jump);
+  // Sparse rim bites — same quiet fleck rate as shadow
+  float fleck = fract(sin(dot(p.xy, vec2(12.9898, 78.233)) + draw * 3.1) * 43758.5453);
+  if (fleck > 0.93) thick *= 0.42;
   transformed += normalize(objectNormal) * uExpand * thick;
+  // Per-drawing silhouette shake (snaps with shadow, mild)
+  float jx = fract(sin(draw * 12.9898 + 1.3) * 43758.5453) - 0.5;
+  float jy = fract(sin(draw * 78.233 + 8.1) * 43758.5453) - 0.5;
+  float lx = fract(sin(p.x * 11.0 + draw * 7.0) * 23421.0) - 0.5;
+  float ly = fract(sin(p.y * 13.0 + draw * 5.0) * 19234.0) - 0.5;
+  transformed.x += (jx * 0.5 + lx * 0.35) * uExpand * 1.15;
+  transformed.y += (jy * 0.5 + ly * 0.35) * uExpand * 1.15;
   #include <project_vertex>
 }
 `;
@@ -43,7 +60,6 @@ function toneFromMaterial(material) {
   const c = new THREE.Color(0x444444);
   if (src?.color) c.copy(src.color);
   if (src?.map) c.lerp(new THREE.Color(0x666666), 0.25);
-  // Keep hue, crush to a dark ink-like value
   c.multiplyScalar(0.28);
   const hsl = { h: 0, s: 0, l: 0 };
   c.getHSL(hsl);
@@ -55,7 +71,7 @@ export function createOutlineMaterial({ skinned = false, color = 0x1a1a22, expan
   return new THREE.ShaderMaterial({
     uniforms: {
       uExpand: { value: expand },
-      uTime: { value: 0 },
+      uFrame: { value: 0 },
       uColor: { value: new THREE.Color(color) },
     },
     vertexShader: VERT,
@@ -66,7 +82,7 @@ export function createOutlineMaterial({ skinned = false, color = 0x1a1a22, expan
   });
 }
 
-/** Attach hand-stroke outlines; returns materials to animate. */
+/** Attach hand-stroke outlines; returns materials to tick. */
 export function attachMeshOutline(root) {
   const mats = [];
   root.traverse((obj) => {
@@ -90,6 +106,8 @@ export function attachMeshOutline(root) {
       obj.add(outline);
     }
     outline.userData.isOutline = true;
+    outline.castShadow = false;
+    outline.receiveShadow = false;
     outline.renderOrder = (obj.renderOrder || 0) - 1;
     outline.frustumCulled = false;
     mats.push(mat);
@@ -97,8 +115,9 @@ export function attachMeshOutline(root) {
   return mats;
 }
 
-export function tickMeshOutline(mats, time) {
+/** @param {number} frame integer hand-drawn frame index */
+export function tickMeshOutline(mats, frame) {
   for (const m of mats) {
-    if (m?.uniforms?.uTime) m.uniforms.uTime.value = time;
+    if (m?.uniforms?.uFrame) m.uniforms.uFrame.value = frame;
   }
 }

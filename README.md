@@ -4,12 +4,14 @@ Procedurally generate a full character in one place: mesh, texture, rig, and ani
 
 ## Run
 
+**Everyday (lean, no npm):** double-click `start.bat`  
+Needs [Python 3](https://www.python.org/) and internet once (Three.js CDN). Opens http://127.0.0.1:8770/
+
+**Vite / Node workflow:** double-click `start-vite.bat`  
 ```bash
 npm install
 npm run dev
 ```
-
-Or on Windows: double-click `start.bat` (opens http://127.0.0.1:8770/).
 
 ## Deploy (Netlify)
 

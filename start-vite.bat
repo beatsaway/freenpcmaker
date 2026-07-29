@@ -6,8 +6,8 @@ set PORT=8770
 set URL=http://127.0.0.1:%PORT%/
 
 echo.
-echo === Free NPC Maker ===
-echo Lean local server (Python + Three.js CDN — no npm)
+echo === Free NPC Maker (Vite) ===
+echo Needs Node.js — use for npm build / Netlify-style workflow.
 echo Freeing port %PORT% ...
 
 powershell -NoProfile -Command ^
@@ -15,17 +15,14 @@ powershell -NoProfile -Command ^
 
 timeout /t 1 /nobreak >nul
 
-where python >nul 2>&1
-if errorlevel 1 (
-  echo Python not found. Install Python 3, or use start-vite.bat instead.
-  pause
-  exit /b 1
-)
-
-if not exist "serve.py" (
-  echo Missing serve.py
-  pause
-  exit /b 1
+if not exist "node_modules\vite\" (
+  echo Installing dependencies...
+  call npm install
+  if errorlevel 1 (
+    echo npm install failed. Is Node.js installed?
+    pause
+    exit /b 1
+  )
 )
 
 echo.
@@ -36,6 +33,5 @@ echo.
 start /b powershell -NoProfile -Command ^
   "for($i=0;$i -lt 60;$i++){ try { $r=Invoke-WebRequest -UseBasicParsing -Uri '%URL%' -TimeoutSec 1; if($r.StatusCode -eq 200){ Start-Process '%URL%'; break } } catch {} ; Start-Sleep -Milliseconds 250 }"
 
-set PORT=%PORT%
-python serve.py
+call npx vite --port %PORT% --host --strictPort
 endlocal

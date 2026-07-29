@@ -2,6 +2,7 @@
  * PatternFactory — canvas textures (CSS-like overlays) with scale + rotation.
  */
 import * as THREE from "three";
+import { applyImperfectFill } from "./imperfectFill.js";
 
 function hexToCss(hex) {
   const n = hex >>> 0;
@@ -283,13 +284,12 @@ export function createPatternTexture(opts = {}) {
   return tex;
 }
 
-/** Cloth / shoe material — unlit flat color (no lighting gradients). */
+/** Cloth / shoe material — flat color with imperfect hand-paint fill. */
 export function clothMaterial(color, pattern = {}) {
   const type = pattern.type || "solid";
   if (type === "solid") {
-    return new THREE.MeshBasicMaterial({ color });
+    return applyImperfectFill(new THREE.MeshBasicMaterial({ color }));
   }
-  // Base color is baked into the canvas; keep material.color white so the map reads true
   const map = createPatternTexture({
     type,
     color,
@@ -299,16 +299,18 @@ export function clothMaterial(color, pattern = {}) {
     rotation: pattern.rotation ?? 0,
   });
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  return new THREE.MeshBasicMaterial({
-    map,
-    color: 0xffffff,
-  });
+  return applyImperfectFill(
+    new THREE.MeshBasicMaterial({
+      map,
+      color: 0xffffff,
+    })
+  );
 }
 
 export function skinMaterial(hex) {
-  return new THREE.MeshBasicMaterial({ color: hex });
+  return applyImperfectFill(new THREE.MeshBasicMaterial({ color: hex }));
 }
 
 export function basicMat(hex, _rough = 0.55) {
-  return new THREE.MeshBasicMaterial({ color: hex });
+  return applyImperfectFill(new THREE.MeshBasicMaterial({ color: hex }));
 }

@@ -41,7 +41,9 @@ import {
   HEAD_SCALE_MIN,
   HEAD_SCALE_MAX,
 } from "../src/index.js";
-import { attachMeshOutline, tickMeshOutline } from "../src/materials/glitchWire.js";
+import { attachMeshOutline, tickMeshOutline, HAND_FPS } from "../src/materials/glitchWire.js";
+import { setPaintFrame } from "../src/materials/imperfectFill.js";
+import { applyHandShadow, setHandShadowFrame } from "../src/materials/handShadow.js";
 
 const lookCodeEl = document.getElementById("look-code");
 const btnLookCopy = document.getElementById("btn-look-copy");
@@ -71,7 +73,8 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NoToneMapping;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.BasicShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap; // soft base → ink threshold (not pixel blocks)
+renderer.shadowMap.autoUpdate = false; // only redraw on hand frames (12fps)
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xffffff);
@@ -96,29 +99,14 @@ function followAvatarCenter() {
   orbit.target.lerp(_avatarCenter, 0.35);
 }
 
-/** White disc → transparent rim (easier / cleaner than blur). */
-function makeSoftGroundMap(size = 256) {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  const g = ctx.createRadialGradient(size / 2, size / 2, size * 0.22, size / 2, size / 2, size * 0.5);
-  g.addColorStop(0, "rgba(255,255,255,1)");
-  g.addColorStop(0.5, "rgba(255,255,255,0.92)");
-  g.addColorStop(0.78, "rgba(255,255,255,0.35)");
-  g.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, size, size);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
+/** Solid white ground — shadow is the visual; no soft rim fade. */
 scene.add(new THREE.AmbientLight(0xffffff, 0.55));
 scene.add(new THREE.HemisphereLight(0xffffff, 0xe8e8ec, 0.25));
 const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
 keyLight.position.set(2.4, 4.2, 3.2);
 keyLight.castShadow = true;
-keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.mapSize.set(1024, 1024);
+keyLight.shadow.radius = 1.8; // less soft so ink flicker can read on the rim
 keyLight.shadow.camera.near = 0.5;
 keyLight.shadow.camera.far = 22;
 keyLight.shadow.camera.left = -3.5;
@@ -132,14 +120,10 @@ const fillLight = new THREE.DirectionalLight(0xffffff, 0.15);
 fillLight.position.set(-2.2, 2.0, 1.2);
 scene.add(fillLight);
 
+// Invisible white floor — only the stepped ink shadow reads
 const ground = new THREE.Mesh(
-  new THREE.CircleGeometry(5.5, 64),
-  new THREE.MeshLambertMaterial({
-    color: 0xffffff,
-    map: makeSoftGroundMap(),
-    transparent: true,
-    depthWrite: false,
-  })
+  new THREE.CircleGeometry(6, 48),
+  applyHandShadow(new THREE.ShadowMaterial({ color: 0x111111, opacity: 0.4 }))
 );
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
@@ -147,6 +131,9 @@ ground.position.y = 0;
 scene.add(ground);
 
 const clock = new THREE.Clock();
+const HAND_DT = 1 / HAND_FPS;
+let handFrame = 0;
+let handAcc = 0;
 let currentConfig = resolveConfig(randomConfig(Date.now() + Math.random() * 1e9));
 let rigged = null;
 let mixer = null;
@@ -941,9 +928,21 @@ window.addEventListener("resize", () => {
 
 function tick() {
   requestAnimationFrame(tick);
-  const dt = clock.getDelta();
-  if (mixer) mixer.update(dt);
-  tickMeshOutline(outlineMats, clock.elapsedTime);
+  // Tab blur pauses rAF; getDelta() then returns a huge gap. Don't catch up —
+  // that would dump many hand frames and look like a speed-up.
+  const dt = Math.min(clock.getDelta(), HAND_DT * 2);
+  handAcc += dt;
+  // Hold each “drawing” for 1/12s — classic hand-drawn step, not continuous morph
+  if (handAcc < HAND_DT) return;
+  handAcc -= HAND_DT;
+  // Drop leftover so we never chain-burst after a pause
+  if (handAcc > HAND_DT) handAcc = 0;
+  handFrame += 1;
+  if (mixer) mixer.update(HAND_DT);
+  setPaintFrame(handFrame);
+  setHandShadowFrame(handFrame);
+  tickMeshOutline(outlineMats, handFrame);
+  renderer.shadowMap.needsUpdate = true; // shadow held between drawings
   followAvatarCenter();
   orbit.update();
   renderer.render(scene, camera);
