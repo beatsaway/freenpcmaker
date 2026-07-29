@@ -2,12 +2,13 @@
  * Compact avatar code — comma-separated groups (no keywords).
  *
  * Example:
- *   1,edc9a8,1 1 1 1 1 1 1,1 1 1 1,0 2a3a4a 1,0,0,0,3 3a2a1a,0 3d8f6e,0 3d8f6e 0 3,0 3a4550,0 2a2a32,Idle,Idle|Walk
+ *   1,edc9a8,1 1 1 1 1 1 1,1 1 1 1,0 2a3a4a 1,0,0,0,3 3a2a1a,0 3d8f6e,0 3d8f6e 0 3,0 3a4550,0 2a2a32,Idle,50,Idle|Walk
  *
  * Groups (in order):
- *   body, skin, prop×7, face×4, eyes, brows, nose, ears, hair, hat, top, bot, shoe [, play] [, pack]
+ *   body, skin, prop×7, face×6, eyes, brows, nose, ears, hair, hat, top, bot, shoe [, play] [, speed%] [, pack]
  *
  * Also accepts the older keyword form (body: 1 …) for pastes.
+ * Older compact codes without a speed group still decode (pack stays after play).
  */
 import {
   BODY_SHAPES,
@@ -74,7 +75,8 @@ function toks(group) {
 /**
  * Encode config (+ optional animation) to compact comma-chain code.
  * @param {object} cfg
- * @param {{ play?: string, pack?: string[] }} [anim]
+ * @param {{ play?: string, pack?: string[], speed?: number }} [anim]
+ *   speed is playback rate (1 = 100%). Encoded as integer percent when present.
  * @returns {string}
  */
 export function encodeLookCode(cfg = {}, anim = {}) {
@@ -84,18 +86,23 @@ export function encodeLookCode(cfg = {}, anim = {}) {
     String(idx(BODY_SHAPES, c.bodyShape)),
     hex6(c.skinTone),
     [c.height?.leg, c.height?.torso, c.height?.neck, c.height?.head, c.body?.armThick, c.body?.legThick, c.body?.hipThick].map(f2).join(" "),
-    [c.face?.eyeDistance, c.face?.roundness, c.face?.length, c.face?.width].map(f2).join(" "),
+    [c.face?.eyeDistance, c.face?.roundness, c.face?.length, c.face?.width, c.face?.eyeDrop, c.face?.noseDrop].map(f2).join(" "),
     `${idx(EYE_STYLES, c.eyes?.style)} ${hex6(c.eyes?.color)} ${f2(c.eyes?.scale)}`,
     String(idx(BROW_STYLES, c.brows?.style)),
     String(idx(NOSE_STYLES, c.nose?.style)),
     String(idx(EAR_STYLES, c.ears?.style)),
     `${idx(HAIR_STYLES, c.hair?.style)} ${hex6(c.hair?.color)}`,
     `${idx(HAT_STYLES, c.hat?.style)} ${hex6(c.hat?.color)}`,
-    `${idx(TOP_STYLES, c.clothes?.top?.style)} ${hex6(c.clothes?.top?.color)} ${idx(PATTERN_TYPES, topPat)} ${Math.min(5, Math.max(2, Math.round(c.clothes?.top?.buttons ?? 3)))}`,
+    `${idx(TOP_STYLES, c.clothes?.top?.style)} ${hex6(c.clothes?.top?.color)} ${idx(PATTERN_TYPES, topPat)} ${Math.min(5, Math.max(2, Math.round(c.clothes?.top?.buttons ?? 3)))} ${f2(c.clothes?.top?.buttonSize ?? 1.4)}`,
     `${idx(BOTTOM_STYLES, c.clothes?.bottom?.style)} ${hex6(c.clothes?.bottom?.color)}`,
     `${idx(SHOE_STYLES, c.clothes?.shoes?.style)} ${hex6(c.clothes?.shoes?.color)}`,
   ];
   if (anim.play) groups.push(String(anim.play).replace(/,/g, " "));
+  if (anim.speed != null && Number.isFinite(Number(anim.speed))) {
+    // Always emit play before speed so decode order stays stable
+    if (!anim.play) groups.push("");
+    groups.push(String(Math.round(Math.max(0, Number(anim.speed) * 100))));
+  }
   if (anim.pack?.length) groups.push(anim.pack.map((n) => String(n).replace(/\|/g, " ")).join("|"));
   return groups.join(",");
 }
@@ -130,7 +137,9 @@ function partialFromMap(map, anim) {
       eyeDistance: num(f[0], 1),
       roundness: num(f[1], 1),
       length: num(f[2], 1),
-      width: num(f[3], 1),
+      width: num(f[3], 0.92),
+      eyeDrop: num(f[4], 0.35),
+      noseDrop: num(f[5], 0.5),
     };
   }
 
@@ -175,6 +184,7 @@ function partialFromMap(map, anim) {
         opacity: 0.85,
       },
       buttons: Math.min(5, Math.max(2, Math.round(num(t[3], 3)))),
+      buttonSize: Math.min(2.4, Math.max(0.8, num(t[4], 1.4))),
     };
   }
 
@@ -216,6 +226,11 @@ function decodeKeywordForm(text) {
       if (rest) anim.play = rest;
       continue;
     }
+    if (key === "speed" || key === "spd") {
+      const pct = Number(rest);
+      if (Number.isFinite(pct)) anim.speed = Math.max(0, pct / 100);
+      continue;
+    }
     if (key === "pack") {
       anim.pack = rest.split("|").map((s) => s.trim()).filter(Boolean);
       continue;
@@ -254,7 +269,13 @@ function decodeCompactForm(text) {
   };
   const anim = {};
   if (groups[13]) anim.play = groups[13];
-  if (groups[14]) anim.pack = groups[14].split("|").map((s) => s.trim()).filter(Boolean);
+  // Optional speed% group (pure number). Older codes put pack directly after play.
+  let packIdx = 14;
+  if (groups[14] != null && groups[14] !== "" && /^\d+(\.\d+)?$/.test(groups[14].trim())) {
+    anim.speed = Math.max(0, Number(groups[14]) / 100);
+    packIdx = 15;
+  }
+  if (groups[packIdx]) anim.pack = groups[packIdx].split("|").map((s) => s.trim()).filter(Boolean);
 
   return partialFromMap(map, anim);
 }
@@ -262,7 +283,7 @@ function decodeCompactForm(text) {
 /**
  * Decode compact or legacy keyword code.
  * @param {string} text
- * @returns {{ ok: true, partial: object, anim: { play?: string, pack?: string[] } } | { ok: false, error: string }}
+ * @returns {{ ok: true, partial: object, anim: { play?: string, pack?: string[], speed?: number } } | { ok: false, error: string }}
  */
 export function decodeLookCode(text) {
   if (text == null || !String(text).trim()) {

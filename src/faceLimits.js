@@ -16,6 +16,8 @@ export function applyEyeDistanceCap(cfg) {
     hd: sk.hd,
     headY: st.head.y,
     roundness: sk.roundness,
+    eyeDrop: cfg.face.eyeDrop ?? 0.35,
+    noseDrop: cfg.face.noseDrop ?? 0.5,
   };
   const probeOpts = {
     ...faceOpts,

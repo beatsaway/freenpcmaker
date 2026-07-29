@@ -3,7 +3,14 @@
  * Limb / torso / neck lengths follow AvatarConfig height multipliers.
  */
 import { humanLayout } from "../mesh/buildConnectedBody.js";
-import { HEAD_SCALE_MIN, HEAD_SCALE_MAX } from "../AvatarConfig.js";
+import {
+  HEAD_SCALE_MIN,
+  HEAD_SCALE_MAX,
+  FACE_WIDTH_MIN,
+  FACE_WIDTH_MAX,
+  FACE_DROP_MIN,
+  FACE_DROP_MAX,
+} from "../AvatarConfig.js";
 
 export const SHAPE = {
   slim: { w: 0.92, d: 0.92, torso: 1, hip: 1 },
@@ -27,7 +34,9 @@ export function faceParams(cfg = {}) {
     // Softened extremes — very low roundness/length made pancake heads
     roundness: clampH(cfg.face?.roundness, 0.45, 1.25),
     length: clampH(cfg.face?.length, 0.65, 2),
-    width: clampH(cfg.face?.width, 0.75, 1.35),
+    width: clampH(cfg.face?.width, FACE_WIDTH_MIN, FACE_WIDTH_MAX),
+    eyeDrop: clampH(cfg.face?.eyeDrop, FACE_DROP_MIN, FACE_DROP_MAX),
+    noseDrop: clampH(cfg.face?.noseDrop, FACE_DROP_MIN, FACE_DROP_MAX),
   };
 }
 
@@ -38,18 +47,18 @@ export function skullSize(cfg, st) {
   const roundT = clampH((f.roundness - 0.45) / 0.8, 0, 1);
   const bodyW = st?.S?.w ?? 1;
 
-  // Base: a bit taller / deeper so “flat” never goes pancake
-  let hw = 0.188 * headScale * (0.94 + 0.06 * bodyW) * f.width;
+  // Narrower base skull — face.width multiplies this further
+  let hw = 0.158 * headScale * (0.94 + 0.06 * bodyW) * f.width;
   let hh = 0.162 * headScale;
   let hd = 0.178 * headScale;
 
-  // Longer face → taller + narrower; shorter → wider
+  // Longer face → taller + narrower; shorter → slightly wider
   hh *= mix(0.88, 1.16, lenT);
-  hw *= mix(1.12, 0.88, lenT);
+  hw *= mix(1.06, 0.9, lenT);
   hd *= mix(1.06, 0.96, lenT);
 
   // Rounder → fuller / more spherical; squarer → flatter cheeks, boxier jaw width
-  hw *= mix(0.94, 1.1, roundT);
+  hw *= mix(0.94, 1.06, roundT);
   hd *= mix(0.94, 1.12, roundT);
   hh *= mix(1.05, 0.95, roundT);
   // Floor depth so profile never collapses (squarer can be a bit shallower)

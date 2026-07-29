@@ -173,8 +173,10 @@ canvas {
 .dock-tab #btn-random {
   flex: 0 0 auto;
   margin-left: auto;
-  padding: 3px 8px;
-  font-size: 9px;
+  padding: 2px 5px;
+  font-size: 8px;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
   transform-origin: center center;
   will-change: transform;
   backface-visibility: hidden;
@@ -185,10 +187,8 @@ canvas {
   filter: none;
 }
 @keyframes lucky-pulse {
-  0% { transform: scale3d(1, 1, 1); }
-  35% { transform: scale3d(0.94, 0.94, 1); }
-  70% { transform: scale3d(1.02, 1.02, 1); }
-  100% { transform: scale3d(1, 1, 1); }
+  0%, 100% { transform: scale3d(1, 1, 1); }
+  50% { transform: scale3d(0.94, 0.94, 1); }
 }
 @media (prefers-reduced-motion: reduce) {
   .dock-tab #btn-random { animation: none; will-change: auto; }
@@ -221,12 +221,12 @@ canvas {
   overflow-x: auto;
 }
 .dock-tab {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 0 0 auto;
+  width: auto;
   display: flex;
   align-items: center;
-  gap: 1px;
-  padding: 4px 5px;
+  gap: 4px;
+  padding: 4px 8px;
   cursor: pointer;
   font-family: Orbitron, sans-serif;
   font-size: 9px;
@@ -243,11 +243,8 @@ canvas {
   box-shadow: inset 0 -2px 0 var(--accent);
 }
 .dock-tab .sum-label {
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .dock-tab .sum-star {
   flex: 0 0 auto;
@@ -259,7 +256,7 @@ canvas {
 }
 .dock-tab .sum-action {
   flex: 0 0 auto;
-  margin-left: auto;
+  margin-left: 4px;
   padding: 2px 5px;
 }
 
@@ -308,7 +305,7 @@ select { flex: 1; min-width: 0; padding: 2px 4px; }
   line-height: 1.2;
 }
 .current-clip-lab { color: #555; flex: 0 0 auto; }
-.current-clip input { margin: 0; flex: 0 0 auto; }
+.current-clip > input[type="checkbox"] { margin: 0; flex: 0 0 auto; }
 .current-clip-name {
   flex: 1;
   min-width: 0;
@@ -316,6 +313,23 @@ select { flex: 1; min-width: 0; padding: 2px 4px; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.anim-speed {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  margin-left: 4px;
+  color: #555;
+  cursor: pointer;
+}
+.anim-speed-lab { font-size: 9px; }
+.anim-speed input[type="range"] {
+  width: 56px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
 }
 
 .field {
@@ -438,10 +452,14 @@ button.rand-star:hover { border-color: var(--line); filter: none; background: #f
   line-height: 1.25;
   padding: 4px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: #f3f1eb;
   color: var(--ink);
   margin-bottom: 4px;
   word-break: break-all;
+  cursor: default;
+}
+#look-code:focus {
+  outline: none;
 }
 
 @media (max-width: 720px) {

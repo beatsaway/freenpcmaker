@@ -29,8 +29,6 @@ export class Hat {
         headTop: st.head.top,
         headY: st.head.y,
         hairStyle,
-        hairMesh: ctx.hair || null,
-        headMesh: ctx.headMesh || null,
         brimMat,
       }) ||
       roundBoxMesh(hw * 1.1, hh * 0.28, hd * 1.05, mat, 0, st.head.top + hh * 0.08, 0, Math.min(hw, hd) * 0.2, 2);

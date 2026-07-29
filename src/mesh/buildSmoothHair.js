@@ -292,7 +292,7 @@ export function buildSmoothHair(mat, opts = {}) {
 }
 
 /**
- * Sample hair SDF for crown height + lateral radius so hats can sit on hair.
+ * Sample hair SDF for crown radius so hats can scale to the hairstyle.
  * @returns {{ topY:number, radius:number, skullTop:number }}
  */
 export function probeHairCrown(opts = {}) {

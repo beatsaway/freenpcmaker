@@ -34,10 +34,9 @@ function sampleField(sdf, x0, x1, y0, y1, z0, z1, nx, ny, nz) {
 }
 
 /**
- * Fit a hat to measured hair/skull crown (not a fixed per-style lift table).
- * Slightly sinks into the crown so the band seats instead of floating.
+ * Size a hat from hairstyle (when available); seat on the skull so hair can intersect.
  *
- * @param {{ style?:string, hw?:number, hh?:number, hd?:number, headY?:number, skullTop?:number, hairMesh?:THREE.Object3D|null, headMesh?:THREE.Object3D|null }} opts
+ * @param {{ style?:string, hw?:number, hh?:number, hd?:number, headY?:number, skullTop?:number, hairStyle?:string }} opts
  * @returns {{ scale:number, lift:number, seatY:number, radius:number }}
  */
 export function fitHatToCrown(opts = {}) {
@@ -46,64 +45,80 @@ export function fitHatToCrown(opts = {}) {
   const D = opts.hd ?? 0.18;
   const skullTop = opts.skullTop ?? opts.headTop ?? 1.76;
   const hairStyle = opts.hairStyle || opts.style || "short";
+  const headY = opts.headY ?? skullTop - H * 0.5;
 
-  let crown = probeHairCrown({
-    style: hairStyle,
-    hw: W,
-    hh: H,
-    hd: D,
-    headY: opts.headY ?? skullTop - H * 0.5,
-    skullTop,
-  });
+  let radius = Math.max(W, D) * 0.52;
+  let scale = 1.05;
 
-  // Prefer real mesh hits when available (smoothed MC can differ from analytic SDF)
-  const meshTop = probeMeshCrownY(opts.hairMesh || opts.headMesh, crown.topY, W, D);
-  if (meshTop != null) crown = { ...crown, topY: meshTop };
+  // Adapt band size to hairstyle volume when we can measure it
+  if (hairStyle && hairStyle !== "bald" && hairStyle !== "none") {
+    try {
+      const crown = probeHairCrown({
+        style: hairStyle,
+        hw: W,
+        hh: H,
+        hd: D,
+        headY,
+        skullTop,
+      });
+      if (crown?.radius > 0) {
+        radius = crown.radius;
+        const targetW = crown.radius * 2.05;
+        scale = targetW / Math.max(1e-6, W);
+        scale = Math.min(1.7, Math.max(1.0, scale));
+      }
+    } catch {
+      // keep skull-based scale
+    }
+  }
 
-  // Seat slightly into the crown so the hat kisses hair instead of hovering
-  const sink = hairStyle === "bald" ? 0.004 : 0.012;
-  const seatY = crown.topY - sink;
+  // Seat on skull — do not lift above hair to “clear” it
+  const seatY = skullTop - 0.008;
   const lift = seatY - skullTop;
 
-  // Scale band to measured crown width (cap overshoot for wild styles like afro)
-  const targetW = crown.radius * 2.08;
-  let scale = targetW / Math.max(1e-6, W);
-  scale = Math.min(1.55, Math.max(1.02, scale));
-
-  return { scale, lift, seatY, radius: crown.radius };
+  return { scale, lift, seatY, radius };
 }
 
 /** @deprecated use fitHatToCrown */
 export function hairHatClearance(hairStyle = "short") {
   const fitted = fitHatToCrown({ hairStyle, hw: 0.16, hh: 0.2, hd: 0.18, skullTop: 1.76 });
-  return { scale: fitted.scale, lift: Math.max(0.004, fitted.lift) };
+  return { scale: fitted.scale, lift: fitted.lift };
 }
 
-function probeMeshCrownY(root, fallbackTop, hw, hd) {
-  if (!root) return null;
-  root.updateWorldMatrix?.(true, true);
-  const raycaster = new THREE.Raycaster();
-  raycaster.near = 0;
-  raycaster.far = 1.2;
-  let maxY = null;
-  const samples = [
-    [0, 0],
-    [hw * 0.12, 0],
-    [-hw * 0.12, 0],
-    [0, -hd * 0.08],
-    [0, hd * 0.05],
-    [hw * 0.08, -hd * 0.05],
-    [-hw * 0.08, -hd * 0.05],
-  ];
-  const dir = new THREE.Vector3(0, -1, 0);
-  for (const [x, z] of samples) {
-    raycaster.set(new THREE.Vector3(x, fallbackTop + 0.4, z), dir);
-    const hits = raycaster.intersectObject(root, true);
-    if (hits.length) {
-      maxY = maxY == null ? hits[0].point.y : Math.max(maxY, hits[0].point.y);
-    }
-  }
-  return maxY;
+/** Party / wizard cone — tip up, band on skull. */
+function buildSolidCone(mat, brimMat, W, H, D, top) {
+  const g = new THREE.Group();
+  g.name = "hat";
+  g.userData.meshMethod = "solid-cone";
+  g.userData.hatStyle = "cone";
+
+  const baseR = Math.max(W, D) * 0.58;
+  const coneH = Math.max(0.16, H * 1.05);
+  const bandH = Math.max(0.02, H * 0.08);
+
+  const band = new THREE.Mesh(
+    new THREE.CylinderGeometry(baseR * 0.98, baseR * 1.06, bandH, 28),
+    brimMat || mat
+  );
+  band.position.set(0, top + bandH * 0.35, 0);
+  band.castShadow = true;
+  band.receiveShadow = true;
+  g.add(band);
+
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(baseR * 0.96, coneH, 28), mat);
+  cone.position.set(0, top + bandH * 0.55 + coneH * 0.48, 0);
+  cone.castShadow = true;
+  cone.receiveShadow = true;
+  g.add(cone);
+
+  // Small tip ball
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(baseR * 0.12, 10, 8), mat);
+  tip.position.set(0, top + bandH * 0.55 + coneH * 0.95, 0);
+  tip.castShadow = true;
+  tip.receiveShadow = true;
+  g.add(tip);
+
+  return g;
 }
 
 /**
@@ -272,23 +287,22 @@ export function buildSmoothHat(mat, opts = {}) {
     hd: opts.hd ?? 0.18,
     headY: opts.headY,
     skullTop: opts.headTop ?? 1.76,
-    hairMesh: opts.hairMesh || null,
-    headMesh: opts.headMesh || null,
   });
   const scale = fitted.scale;
   const W = (opts.hw ?? 0.16) * scale;
   const H = (opts.hh ?? 0.2) * Math.min(1.12, 0.92 + scale * 0.12);
   const D = (opts.hd ?? 0.18) * scale;
-  // Seat on measured crown (already includes a slight sink)
+  // Seat on skull (size may still follow hairstyle)
   const top = fitted.seatY;
   const brimMat = opts.brimMat || mat;
   const res = opts.resolution ?? 30;
   const k = 0.02;
 
-  // Domed hats: solid primitives — MC left hollow crowns
+  // Domed / solid hats: closed primitives — MC left hollow crowns
   if (style === "sunhat") return buildSolidSunhat(mat, brimMat, W, H, D, top);
   if (style === "bowler") return buildSolidBowler(mat, brimMat, W, H, D, top);
   if (style === "roundcap") return buildSolidRoundcap(mat, W, H, D, top);
+  if (style === "cone") return buildSolidCone(mat, brimMat, W, H, D, top);
 
   function sdfCap(px, py, pz) {
     let d = sdEllipsoid(px, py, pz, 0, top + H * 0.02, -D * 0.02, W * 0.52, H * 0.2, D * 0.5);

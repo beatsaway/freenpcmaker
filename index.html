@@ -54,7 +54,7 @@
 
   <div class="dock-body">
     <div class="dock-pane" id="pane-code">
-      <textarea id="look-code" rows="3" spellcheck="false" placeholder="1,edc9a8,1 1 1 1…"></textarea>
+      <textarea id="look-code" rows="3" spellcheck="false" readonly placeholder="1,edc9a8,1 1 1 1…"></textarea>
       <div class="row tight">
         <button type="button" class="secondary" id="btn-look-copy">Copy</button>
         <button type="button" class="secondary" id="btn-look-apply">Paste</button>
@@ -70,6 +70,10 @@
         <span class="current-clip-lab">Clip:</span>
         <input type="checkbox" id="current-clip-check" title="Include this clip in download">
         <span class="current-clip-name" id="current-clip-name">—</span>
+        <label class="anim-speed" title="Animation speed">
+          <span class="anim-speed-lab">Speed</span>
+          <input type="range" id="anim-speed" min="0" max="200" value="50" step="5">
+        </label>
       </div>
       <div class="field">
         <label><span class="lab-text">Filter</span></label>

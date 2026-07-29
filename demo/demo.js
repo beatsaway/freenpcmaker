@@ -6,7 +6,6 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { SkeletonHelper } from "three";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import {
   AvatarBuilder,
   autoRigAvatar,
@@ -14,7 +13,6 @@ import {
   getAdaptedClips,
   randomConfig,
   resolveConfig,
-  PRESETS,
   maxEyeScaleForDistance,
   clampEyeScale,
   clampEyeDistance,
@@ -25,6 +23,15 @@ import {
   applyLookCode,
   EYE_SCALE_MIN,
   EYE_DISTANCE_MIN,
+  FACE_WIDTH_MIN,
+  FACE_WIDTH_MAX,
+  FACE_DROP_MIN,
+  FACE_DROP_MAX,
+  BUTTON_SIZE_MIN,
+  BUTTON_SIZE_MAX,
+  maxEyeDropForNose,
+  minNoseDropForEye,
+  clampFaceFeatureDrops,
   HEAD_SCALE_MIN,
   HEAD_SCALE_MAX,
 } from "../src/index.js";
@@ -36,6 +43,7 @@ const randLookMod = document.getElementById("rand-look-mod");
 const randAnimMod = document.getElementById("rand-anim-mod");
 const currentClipCheck = document.getElementById("current-clip-check");
 const currentClipNameEl = document.getElementById("current-clip-name");
+const animSpeedEl = document.getElementById("anim-speed");
 const exportCountEl = document.getElementById("export-count");
 const btnExport = document.getElementById("btn-export");
 const btnExportMesh = document.getElementById("btn-export-mesh");
@@ -54,80 +62,52 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.NoToneMapping;
+renderer.shadowMap.enabled = false;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000000);
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-scene.environmentIntensity = 0.55;
+scene.background = new THREE.Color(0xffffff);
 
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 40);
-camera.position.set(2.2, 1.5, 2.6);
+camera.position.set(0, 1.35, 3.4);
 
 const orbit = new OrbitControls(camera, canvas);
-orbit.target.set(0, 1.0, 0);
+orbit.target.set(0, 1.05, 0);
 orbit.enableDamping = true;
-orbit.autoRotate = true;
-orbit.autoRotateSpeed = 1.2;
-const ORBIT_SPEED_FRONT = 0.85; // facing NPC front (+Z)
-const ORBIT_SPEED_BACK = 5.5; // facing NPC back — whip around
+orbit.enablePan = false;
+orbit.minDistance = 1.8;
+orbit.maxDistance = 12;
+const _avatarBox = new THREE.Box3();
+const _avatarCenter = new THREE.Vector3();
 
-// Cinematic three-point: dim fill, warm key, cool rim
-scene.add(new THREE.AmbientLight(0xffffff, 0.18));
-const hemi = new THREE.HemisphereLight(0xffe8d6, 0x1a2030, 0.35);
-scene.add(hemi);
+function followAvatarCenter() {
+  if (!rigged?.group) return;
+  _avatarBox.setFromObject(rigged.group);
+  if (_avatarBox.isEmpty()) return;
+  _avatarBox.getCenter(_avatarCenter);
+  orbit.target.lerp(_avatarCenter, 0.35);
+}
 
-const key = new THREE.DirectionalLight(0xfff0dd, 1.55);
-key.position.set(3.2, 5.5, 2.4);
-key.castShadow = true;
-key.shadow.mapSize.set(2048, 2048);
-key.shadow.camera.near = 0.5;
-key.shadow.camera.far = 22;
-key.shadow.camera.left = -4;
-key.shadow.camera.right = 4;
-key.shadow.camera.top = 5;
-key.shadow.camera.bottom = -1;
-key.shadow.bias = -0.00015;
-key.shadow.normalBias = 0.035;
-scene.add(key);
-
-const fill = new THREE.DirectionalLight(0x9bb6ff, 0.28);
-fill.position.set(-3.5, 2.2, 1.5);
-scene.add(fill);
-
-const rim = new THREE.DirectionalLight(0xb8d4ff, 0.75);
-rim.position.set(-1.5, 3.5, -4);
-scene.add(rim);
+// Unlit MeshBasic materials — ambient only (directionals unused)
+scene.add(new THREE.AmbientLight(0xffffff, 1));
 
 const floor = new THREE.Mesh(
   new THREE.CircleGeometry(4.5, 64),
-  new THREE.MeshStandardMaterial({
-    color: 0x0a0a0c,
-    roughness: 0.18,
-    metalness: 0.72,
-    envMapIntensity: 1.1,
-  })
+  new THREE.MeshBasicMaterial({ color: 0xf0f0f2 })
 );
 floor.rotation.x = -Math.PI / 2;
-floor.receiveShadow = true;
 scene.add(floor);
 
-const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
 const clock = new THREE.Clock();
-const presetNames = Object.keys(PRESETS);
-const startPreset = presetNames[Math.floor(Math.random() * presetNames.length)] || "jordan";
-let currentConfig = resolveConfig(PRESETS[startPreset]);
+let currentConfig = resolveConfig(randomConfig(Date.now() + Math.random() * 1e9));
 let rigged = null;
 let mixer = null;
 let sourceClips = [];
 let adaptedClips = [];
 let action = null;
 let playing = true;
+/** Animation playback rate — default 50% */
+let animSpeed = 0.5;
 let skeletonHelper = null;
 let busy = false;
 /** Currently previewing clip name */
@@ -141,7 +121,9 @@ const randomLocks = Object.create(null);
 const exportSelected = new Set();
 let exporting = false;
 
-const catalog = AvatarBuilder.catalog();
+function catalog() {
+  return AvatarBuilder.catalog();
+}
 
 const RANDOM_PATHS = [
   "bodyShape",
@@ -157,6 +139,8 @@ const RANDOM_PATHS = [
   "face.roundness",
   "face.length",
   "face.width",
+  "face.eyeDrop",
+  "face.noseDrop",
   "eyes.style",
   "eyes.color",
   "eyes.scale",
@@ -171,6 +155,7 @@ const RANDOM_PATHS = [
   "clothes.top.color",
   "clothes.top.pattern",
   "clothes.top.buttons",
+  "clothes.top.buttonSize",
   "clothes.bottom.style",
   "clothes.bottom.color",
   "clothes.shoes.style",
@@ -195,6 +180,7 @@ function dumpLookCode() {
   lookCodeEl.value = encodeLookCode(currentConfig, {
     play: currentClipName || undefined,
     pack: [...exportSelected],
+    speed: animSpeed,
   });
 }
 
@@ -289,46 +275,6 @@ function clearRigged() {
   mixer = null;
   action = null;
   rigged = null;
-}
-
-function forEachNpcMaterial(root, fn) {
-  root?.traverse((obj) => {
-    if (!obj.isMesh || !obj.material) return;
-    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-    for (const m of mats) if (m) fn(m);
-  });
-}
-
-function setNpcOpacity(root, opacity) {
-  forEachNpcMaterial(root, (m) => {
-    m.transparent = true;
-    m.opacity = opacity;
-    m.depthWrite = opacity > 0.92;
-    m.needsUpdate = true;
-  });
-}
-
-function tweenNpcOpacity(root, from, to, ms) {
-  return new Promise((resolve) => {
-    if (!root) {
-      resolve();
-      return;
-    }
-    if (prefersReducedMotion || ms <= 0) {
-      setNpcOpacity(root, to);
-      resolve();
-      return;
-    }
-    const t0 = performance.now();
-    function step(now) {
-      const t = Math.min(1, (now - t0) / ms);
-      const e = t * t * (3 - 2 * t);
-      setNpcOpacity(root, from + (to - from) * e);
-      if (t < 1) requestAnimationFrame(step);
-      else resolve();
-    }
-    requestAnimationFrame(step);
-  });
 }
 
 function populateAnimSelect(preferName) {
@@ -544,11 +490,35 @@ function playSelected() {
   action = mixer.clipAction(clip);
   action.reset();
   action.setLoop(THREE.LoopRepeat, Infinity);
+  action.timeScale = animSpeed;
   action.paused = !playing;
   action.play();
   syncPlayButton();
   syncCurrentClipRow();
 }
+
+function applyAnimSpeed() {
+  if (animSpeedEl) {
+    animSpeed = Math.max(0, Number(animSpeedEl.value) / 100);
+    animSpeedEl.title = `Speed ${Math.round(animSpeed * 100)}%`;
+  }
+  if (action) action.timeScale = animSpeed;
+  if (mixer) mixer.timeScale = 1;
+  dumpLookCode();
+}
+
+function setAnimSpeed(rate) {
+  animSpeed = Math.max(0, Number(rate) || 0);
+  if (animSpeedEl) {
+    animSpeedEl.value = String(Math.round(animSpeed * 100));
+    animSpeedEl.title = `Speed ${Math.round(animSpeed * 100)}%`;
+  }
+  if (action) action.timeScale = animSpeed;
+  if (mixer) mixer.timeScale = 1;
+}
+
+animSpeedEl?.addEventListener("input", applyAnimSpeed);
+applyAnimSpeed();
 
 async function rebuildRigged() {
   if (busy) return;
@@ -564,6 +534,11 @@ async function rebuildRigged() {
     const result = await autoRigAvatar(currentConfig);
     rigged = result;
     scene.add(result.group);
+    _avatarBox.setFromObject(result.group);
+    if (!_avatarBox.isEmpty()) {
+      _avatarBox.getCenter(_avatarCenter);
+      orbit.target.copy(_avatarCenter);
+    }
 
     skeletonHelper = new SkeletonHelper(result.group);
     skeletonHelper.visible = false;
@@ -672,9 +647,10 @@ function buildLookControls() {
   controlsEl.innerHTML = "";
   ensureClothes();
   const c = currentConfig;
+  const cat = catalog();
 
   section("Body");
-  selectField("Shape", catalog.bodyShapes, () => c.bodyShape, (v) => { c.bodyShape = v; }, "bodyShape");
+  selectField("Shape", cat.bodyShapes, () => c.bodyShape, (v) => { c.bodyShape = v; }, "bodyShape");
   colorField("Skin", () => c.skinTone, (v) => { c.skinTone = v; }, "skinTone");
   if (!c.height) c.height = { leg: 1, torso: 1, neck: 1, head: 1 };
   if (!c.body) c.body = { hipThick: 1, armThick: 1, legThick: 1 };
@@ -689,7 +665,7 @@ function buildLookControls() {
   rangeField("Hip thick", 0.9, 2.2, 0.05, () => c.body.hipThick ?? 1, (v) => { c.body.hipThick = v; }, "body.hipThick");
 
   section("Face");
-  if (!c.face) c.face = { eyeDistance: 1, roundness: 1, length: 1, width: 1 };
+  if (!c.face) c.face = { eyeDistance: 1, roundness: 1, length: 1, width: 0.92, eyeDrop: 0.35, noseDrop: 0.5 };
   {
     const eyeDistMax = maxEyeDistanceForWidth(skullSize(c).hw);
     rangeField("Eye distance", EYE_DISTANCE_MIN, eyeDistMax, 0.05, () => c.face.eyeDistance ?? 1, (v) => {
@@ -700,8 +676,18 @@ function buildLookControls() {
   }
   rangeField("Face round", 0.45, 1.25, 0.05, () => c.face.roundness ?? 1, (v) => { c.face.roundness = v; }, "face.roundness");
   rangeField("Face length", 0.65, 2, 0.05, () => c.face.length ?? 1, (v) => { c.face.length = v; }, "face.length");
-  rangeField("Face width", 0.75, 1.35, 0.05, () => c.face.width ?? 1, (v) => { c.face.width = v; }, "face.width");
-  selectField("Eyes", catalog.eyeStyles, () => c.eyes.style, (v) => { c.eyes.style = v; }, "eyes.style");
+  rangeField("Face width", FACE_WIDTH_MIN, FACE_WIDTH_MAX, 0.05, () => c.face.width ?? 0.92, (v) => { c.face.width = v; }, "face.width");
+  rangeField("Eye drop", FACE_DROP_MIN, maxEyeDropForNose(c.face.noseDrop ?? 0.5), 0.05, () => c.face.eyeDrop ?? 0.35, (v) => {
+    c.face.eyeDrop = v;
+    clampFaceFeatureDrops(c.face);
+    buildLookControls();
+  }, "face.eyeDrop");
+  rangeField("Nose drop", minNoseDropForEye(c.face.eyeDrop ?? 0.35), FACE_DROP_MAX, 0.05, () => c.face.noseDrop ?? 0.5, (v) => {
+    c.face.noseDrop = v;
+    clampFaceFeatureDrops(c.face);
+    buildLookControls();
+  }, "face.noseDrop");
+  selectField("Eyes", cat.eyeStyles, () => c.eyes.style, (v) => { c.eyes.style = v; }, "eyes.style");
   colorField("Eye color", () => c.eyes.color, (v) => { c.eyes.color = v; }, "eyes.color");
   {
     const eyeMax = maxEyeScaleForDistance(c.face.eyeDistance ?? 1);
@@ -710,31 +696,33 @@ function buildLookControls() {
     }, "eyes.scale");
   }
   if (!c.brows) c.brows = { style: "straight", scale: 1 };
-  selectField("Brows", catalog.browStyles, () => c.brows.style, (v) => { c.brows.style = v; }, "brows.style");
-  selectField("Nose", catalog.noseStyles, () => c.nose.style, (v) => { c.nose.style = v; }, "nose.style");
-  selectField("Ears", catalog.earStyles, () => c.ears.style, (v) => { c.ears.style = v; }, "ears.style");
+  selectField("Brows", cat.browStyles, () => c.brows.style, (v) => { c.brows.style = v; }, "brows.style");
+  selectField("Nose", cat.noseStyles, () => c.nose.style, (v) => { c.nose.style = v; }, "nose.style");
+  selectField("Ears", cat.earStyles, () => c.ears.style, (v) => { c.ears.style = v; }, "ears.style");
 
   section("Hair / hat");
-  selectField("Hair", catalog.hairStyles, () => c.hair.style, (v) => { c.hair.style = v; }, "hair.style");
+  selectField("Hair", cat.hairStyles, () => c.hair.style, (v) => { c.hair.style = v; }, "hair.style");
   colorField("Hair color", () => c.hair.color, (v) => { c.hair.color = v; }, "hair.color");
-  selectField("Hat", catalog.hatStyles, () => c.hat.style, (v) => { c.hat.style = v; }, "hat.style");
+  selectField("Hat", cat.hatStyles, () => c.hat.style, (v) => { c.hat.style = v; }, "hat.style");
   colorField("Hat color", () => c.hat.color, (v) => { c.hat.color = v; }, "hat.color");
 
   section("Clothes · top");
-  selectField("Top style", catalog.topStyles, () => c.clothes.top.style, (v) => { c.clothes.top.style = v; }, "clothes.top.style");
+  selectField("Top style", cat.topStyles, () => c.clothes.top.style, (v) => { c.clothes.top.style = v; }, "clothes.top.style");
   colorField("Top color", () => c.clothes.top.color, (v) => { c.clothes.top.color = v; }, "clothes.top.color");
-  selectField("Top pattern", catalog.patterns, () => c.clothes.top.pattern.type, (v) => { c.clothes.top.pattern.type = v; }, "clothes.top.pattern");
+  selectField("Top pattern", cat.patterns, () => c.clothes.top.pattern.type, (v) => { c.clothes.top.pattern.type = v; }, "clothes.top.pattern");
   if (c.clothes.top.style === "polo" || c.clothes.top.style === "jacket") {
     if (c.clothes.top.buttons == null) c.clothes.top.buttons = 3;
+    if (c.clothes.top.buttonSize == null) c.clothes.top.buttonSize = 1.4;
     rangeField("Buttons", 2, 5, 1, () => c.clothes.top.buttons ?? 3, (v) => { c.clothes.top.buttons = Math.round(v); }, "clothes.top.buttons");
+    rangeField("Button size", BUTTON_SIZE_MIN, BUTTON_SIZE_MAX, 0.05, () => c.clothes.top.buttonSize ?? 1.4, (v) => { c.clothes.top.buttonSize = v; }, "clothes.top.buttonSize");
   }
 
   section("Clothes · bottom");
-  selectField("Bottom style", catalog.bottomStyles, () => c.clothes.bottom.style, (v) => { c.clothes.bottom.style = v; }, "clothes.bottom.style");
+  selectField("Bottom style", cat.bottomStyles, () => c.clothes.bottom.style, (v) => { c.clothes.bottom.style = v; }, "clothes.bottom.style");
   colorField("Bottom color", () => c.clothes.bottom.color, (v) => { c.clothes.bottom.color = v; }, "clothes.bottom.color");
 
   section("Shoes");
-  selectField("Shoe style", catalog.shoeStyles, () => c.clothes.shoes.style, (v) => { c.clothes.shoes.style = v; }, "clothes.shoes.style");
+  selectField("Shoe style", cat.shoeStyles, () => c.clothes.shoes.style, (v) => { c.clothes.shoes.style = v; }, "clothes.shoes.style");
   colorField("Shoe color", () => c.clothes.shoes.color, (v) => { c.clothes.shoes.color = v; }, "clothes.shoes.color");
   dumpLookCode();
   syncModulePanes();
@@ -776,14 +764,7 @@ btnRandom.addEventListener("click", async () => {
   currentConfig = mergeRandomLocked(currentConfig, full);
   pendingAnimPrefer = isRandOn("module.anim") ? "random" : currentClipName;
   buildLookControls();
-  const prevGroup = rigged?.group;
-  if (prevGroup) await tweenNpcOpacity(prevGroup, 1, 0, 120);
   await rebuildRigged();
-  const nextGroup = rigged?.group;
-  if (nextGroup) {
-    setNpcOpacity(nextGroup, 0);
-    await tweenNpcOpacity(nextGroup, 0, 1, 140);
-  }
 });
 
 btnPlay.addEventListener("click", () => {
@@ -821,6 +802,7 @@ btnLookCopy?.addEventListener("click", async () => {
   const text = encodeLookCode(currentConfig, {
     play: currentClipName || undefined,
     pack: [...exportSelected],
+    speed: animSpeed,
   });
   lookCodeEl.value = text;
   try {
@@ -832,8 +814,8 @@ btnLookCopy?.addEventListener("click", async () => {
   }
 });
 
-btnLookApply?.addEventListener("click", () => {
-  const result = applyLookCode(lookCodeEl.value);
+function applyGenesText(text) {
+  const result = applyLookCode(text);
   if (!result.ok) {
     setStatus(`Genes: ${result.error}`);
     return;
@@ -843,11 +825,24 @@ btnLookApply?.addEventListener("click", () => {
     exportSelected.clear();
     for (const n of result.anim.pack) exportSelected.add(n);
   }
+  if (result.anim?.speed != null && Number.isFinite(result.anim.speed)) {
+    setAnimSpeed(result.anim.speed);
+  }
   pendingAnimPrefer = result.anim?.play || currentClipName;
   buildLookControls();
   dumpLookCode();
   rebuildRigged();
-  setStatus("Genes pasted");
+  setStatus("Genes applied");
+}
+
+btnLookApply?.addEventListener("click", async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (lookCodeEl) lookCodeEl.value = text;
+    applyGenesText(text);
+  } catch {
+    setStatus("Genes: allow clipboard access, or copy a code first");
+  }
 });
 
 window.addEventListener("resize", () => {
@@ -860,10 +855,7 @@ function tick() {
   requestAnimationFrame(tick);
   const dt = clock.getDelta();
   if (mixer) mixer.update(dt);
-  // Slow across the front half, fast across the back (avatar faces +Z; θ=0 is front)
-  const backAmt = 0.5 - 0.5 * Math.cos(orbit.getAzimuthalAngle()); // 0 front → 1 back
-  const t = backAmt * backAmt; // ease — linger slow in front, rush the back
-  orbit.autoRotateSpeed = ORBIT_SPEED_FRONT + (ORBIT_SPEED_BACK - ORBIT_SPEED_FRONT) * t;
+  followAvatarCenter();
   orbit.update();
   renderer.render(scene, camera);
 }

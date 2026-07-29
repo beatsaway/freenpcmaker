@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { buildStack, roundBoxMesh, sphereMesh, skullSize } from "./Primitives.js";
 import { skinMaterial, basicMat } from "../materials/PatternFactory.js";
-import { clampEyeScale, clampEyeDistance, eyeHalfSpread } from "../AvatarConfig.js";
+import { clampEyeScale, clampEyeDistance, eyeHalfSpread, faceEyeY, faceNoseY, clampFaceFeatureDrops, faceFeatureScale } from "../AvatarConfig.js";
 import { buildSmoothNose, buildSmoothEar, buildSmoothBrow } from "../mesh/buildSmoothFeatures.js";
 import { buildSmoothFace, faceSurfaceZ, faceSurfaceZFromSdf, headSurfaceX } from "../mesh/buildSmoothFace.js";
 
@@ -23,7 +23,18 @@ export class Head {
     const skin = skinMaterial(cfg.skinTone);
     const { hw, hh, hd, roundness } = skullSize(cfg, st);
     const headY = st.head.y;
-    const faceOpts = { hw, hh, hd, headY, roundness };
+    const faceOpts = {
+      hw,
+      hh,
+      hd,
+      headY,
+      roundness,
+      eyeDrop: cfg.face?.eyeDrop ?? 0.35,
+      noseDrop: cfg.face?.noseDrop ?? 0.5,
+    };
+    if (cfg.face) clampFaceFeatureDrops(cfg.face, hh);
+    faceOpts.eyeDrop = cfg.face?.eyeDrop ?? faceOpts.eyeDrop;
+    faceOpts.noseDrop = cfg.face?.noseDrop ?? faceOpts.noseDrop;
 
     const cranium =
       buildSmoothFace(skin, faceOpts) ||
@@ -66,10 +77,11 @@ export class FaceFeatures {
     };
     const eyeDist = clampEyeDistance(cfg.face?.eyeDistance ?? 1, hw, probeOpts);
     if (cfg.face) cfg.face.eyeDistance = eyeDist;
-    const sc = clampEyeScale(cfg.eyes?.scale ?? 1, eyeDist, hw);
+    const faceSc = faceFeatureScale(hw, hh);
+    const sc = clampEyeScale(cfg.eyes?.scale ?? 1, eyeDist, hw) * faceSc;
     const mat = basicMat(col, 0.35);
     const white = basicMat(0xf2f4f6, 0.5);
-    const y = headY + hh * 0.08;
+    const y = faceEyeY(headY, hh, cfg.face?.eyeDrop ?? faceOpts?.eyeDrop ?? 0.35);
     const spread = eyeHalfSpread(eyeDist, hw);
 
     const makeEye = (x) => {
@@ -77,29 +89,36 @@ export class FaceFeatures {
       const surf = FaceFeatures.skinZ(headMesh, x, y, faceOpts, hd);
       const eg = new THREE.Group();
       if (style === "wide") {
-        const depth = 0.018;
+        const depth = 0.018 * faceSc;
         const z = surf + depth * 0.5;
-        eg.add(roundBoxMesh(0.065 * sc, 0.032 * sc, depth, white, x, y, z, 0.008));
-        eg.add(roundBoxMesh(0.032 * sc, 0.026 * sc, depth * 0.7, mat, x, y, z + 0.003 * FACE, 0.006));
+        eg.add(roundBoxMesh(0.065 * sc, 0.032 * sc, depth, white, x, y, z, 0.008 * faceSc));
+        eg.add(roundBoxMesh(0.032 * sc, 0.026 * sc, depth * 0.7, mat, x, y, z + 0.003 * FACE * faceSc, 0.006 * faceSc));
       } else if (style === "almond") {
         const s = 0.036 * sc;
-        const depth = 0.016;
+        const depth = 0.016 * faceSc;
         const z = surf + depth * 0.5;
-        const sclera = roundBoxMesh(s, s, depth, white, x, y, z, 0.003, 1);
+        const sclera = roundBoxMesh(s, s, depth, white, x, y, z, 0.003 * faceSc, 1);
         sclera.rotation.z = Math.PI / 4;
         eg.add(sclera);
-        const iris = roundBoxMesh(0.018 * sc, 0.018 * sc, depth * 0.7, mat, x, y, z + 0.003 * FACE, 0.002, 1);
+        const iris = roundBoxMesh(0.018 * sc, 0.018 * sc, depth * 0.7, mat, x, y, z + 0.003 * FACE * faceSc, 0.002 * faceSc, 1);
         iris.rotation.z = Math.PI / 4;
         eg.add(iris);
       } else {
+        // Oval: flat sphere sclera — pupil must sit on the front (depth grows with scale)
         const r = 0.02 * sc;
         const zScale = 0.55;
-        const z = surf + r * zScale * 0.5;
+        const halfDepth = r * zScale;
+        const z = surf + halfDepth * 0.5;
         const sclera = sphereMesh(r, white, x, y, z, 10, 8);
         sclera.scale.set(1.45, 0.88, zScale);
         eg.add(sclera);
-        const iris = sphereMesh(0.013 * sc, mat, x, y, z + 0.003 * FACE, 8, 6);
-        iris.scale.set(1.25, 0.92, 0.7);
+        const irisR = Math.max(0.009 * faceSc, 0.012 * sc);
+        const irisZScale = 0.65;
+        const irisHalf = irisR * irisZScale;
+        const irisZ = z + halfDepth * 0.95 + irisHalf * 0.4;
+        const iris = sphereMesh(irisR, mat, x, y, irisZ, 8, 6);
+        iris.scale.set(1.2, 0.9, irisZScale);
+        iris.renderOrder = 2;
         eg.add(iris);
       }
       return eg;
@@ -111,9 +130,11 @@ export class FaceFeatures {
 
   static addNose(g, cfg, headY, hd, headMesh, faceOpts) {
     const style = cfg.nose?.style || "button";
-    const sc = cfg.nose?.scale ?? 1;
+    const hw = faceOpts?.hw ?? 0.16;
+    const hh = faceOpts?.hh ?? 0.16;
+    const sc = (cfg.nose?.scale ?? 1) * faceFeatureScale(hw, hh);
     const skin = skinMaterial(cfg.skinTone);
-    const y = headY - 0.015;
+    const y = faceNoseY(headY, hh, cfg.face?.noseDrop ?? faceOpts?.noseDrop ?? 0.5);
     // Nose SDF grows +Z from origin — park origin on the skin
     const surf = FaceFeatures.skinZ(headMesh, 0, y, faceOpts, hd);
 
@@ -128,7 +149,7 @@ export class FaceFeatures {
     const style = cfg.ears?.style || "round";
     // Floor scale + scale with head width so tiny ears can't leave a temple gap
     const rawSc = cfg.ears?.scale ?? 1;
-    const sc = Math.max(0.95, rawSc) * Math.max(0.9, hw / 0.16);
+    const sc = Math.max(0.95, rawSc) * faceFeatureScale(hw, hh);
     const skin = skinMaterial(cfg.skinTone);
     const y = headY + (style === "point" ? 0.01 : 0);
     const z = 0;
@@ -158,10 +179,12 @@ export class FaceFeatures {
     const style = cfg.brows?.style || "straight";
     if (style === "none") return;
 
-    const sc = cfg.brows?.scale ?? 1;
+    const faceSc = faceFeatureScale(hw, hh);
+    const sc = (cfg.brows?.scale ?? 1) * faceSc;
     const mat = basicMat(cfg.brows?.color ?? cfg.hair?.color ?? 0x3a2a1a, 0.8);
-    const depth = 0.012;
-    const baseY = headY + hh * 0.22;
+    const depth = 0.012 * faceSc;
+    const eyeY = faceEyeY(headY, hh, cfg.face?.eyeDrop ?? faceOpts?.eyeDrop ?? 0.35);
+    const baseY = eyeY + hh * 0.12;
     const eyeDist = cfg.face?.eyeDistance ?? 1;
     const spread = eyeHalfSpread(eyeDist, hw);
     const surf = FaceFeatures.skinZ(headMesh, spread, baseY, faceOpts, hd);

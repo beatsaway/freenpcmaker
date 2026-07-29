@@ -11,12 +11,84 @@ export const EYE_SCALE_MIN = 0.6;
 export const EYE_SCALE_MAX = 2.8; // doubled from 1.4
 export const EYE_DISTANCE_MIN = 0.45;
 export const EYE_DISTANCE_MAX = 3.6;
+/** Face width slider — multiplies skull half-width (hw). */
+export const FACE_WIDTH_MIN = 0.65;
+export const FACE_WIDTH_MAX = 1.12;
+/** 0 = high on face, 1 = low toward chin. */
+export const FACE_DROP_MIN = 0;
+export const FACE_DROP_MAX = 1;
 /** Half-spread at eyeDistance=1 when hw=0.34 (matches Head placement). */
 const EYE_SPREAD_AT_1 = 0.055;
 /** Approx half-width of an eye at scale=1 (used for overlap limits). */
 const EYE_HALF_AT_1 = 0.038;
 /** Max eye X as a fraction of skull width — keeps eyes on the front face. */
 const EYE_MAX_X_FRAC = 0.34;
+
+function clamp01(n, fallback = 0.5) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.min(1, Math.max(0, v));
+}
+
+function mix(a, b, t) {
+  return a + (b - a) * t;
+}
+
+/** Relative face size vs a reference skull — scales eyes / nose / brows. */
+export function faceFeatureScale(hw = 0.16, hh = 0.16) {
+  const ref = 0.155;
+  const size = Math.sqrt(Math.max(1e-6, hw) * Math.max(1e-6, hh));
+  return size / ref;
+}
+
+/** Vertical placement of eyes on the skull (world Y). eyeDrop 0=high, 1=low. */
+export function faceEyeY(headY, hh, eyeDrop = 0.35) {
+  const t = clamp01(eyeDrop, 0.35);
+  return headY + (hh || 0.16) * mix(0.2, -0.26, t);
+}
+
+/** Vertical placement of nose on the skull (world Y). noseDrop 0=high, 1=low. */
+export function faceNoseY(headY, hh, noseDrop = 0.5) {
+  const t = clamp01(noseDrop, 0.5);
+  return headY + (hh || 0.16) * mix(0.06, -0.42, t);
+}
+
+/** Min vertical gap between eye and nose centers (fraction of skull height). */
+const FACE_EYE_NOSE_GAP = 0.08;
+
+/** Max eyeDrop so eyes stay above the nose. */
+export function maxEyeDropForNose(noseDrop = 0.5, hh = 0.16) {
+  const h = hh || 0.16;
+  const noseY = faceNoseY(0, h, noseDrop);
+  const targetRel = (noseY + h * FACE_EYE_NOSE_GAP) / h;
+  // faceEyeY: mix(0.2, -0.26, t) = 0.2 - 0.46*t >= targetRel
+  const maxT = (0.2 - targetRel) / 0.46;
+  return Math.min(FACE_DROP_MAX, Math.max(FACE_DROP_MIN, maxT));
+}
+
+/** Min noseDrop so the nose stays below the eyes. */
+export function minNoseDropForEye(eyeDrop = 0.35, hh = 0.16) {
+  const h = hh || 0.16;
+  const eyeY = faceEyeY(0, h, eyeDrop);
+  const targetRel = (eyeY - h * FACE_EYE_NOSE_GAP) / h;
+  // faceNoseY: mix(0.06, -0.42, t) = 0.06 - 0.48*t <= targetRel
+  const minT = (0.06 - targetRel) / 0.48;
+  return Math.min(FACE_DROP_MAX, Math.max(FACE_DROP_MIN, minT));
+}
+
+/** Mutates face.eyeDrop / face.noseDrop so eyes stay above the nose. */
+export function clampFaceFeatureDrops(face, hh = 0.16) {
+  if (!face) return face;
+  let eyeDrop = clamp01(face.eyeDrop, 0.35);
+  let noseDrop = clamp01(face.noseDrop, 0.5);
+  eyeDrop = Math.min(eyeDrop, maxEyeDropForNose(noseDrop, hh));
+  noseDrop = Math.max(noseDrop, minNoseDropForEye(eyeDrop, hh));
+  // Re-clamp eye in case nose was pushed
+  eyeDrop = Math.min(eyeDrop, maxEyeDropForNose(noseDrop, hh));
+  face.eyeDrop = eyeDrop;
+  face.noseDrop = noseDrop;
+  return face;
+}
 
 /** Center offset of one eye from midline. */
 export function eyeHalfSpread(eyeDistance = 1, hw = 0.34) {
@@ -26,7 +98,7 @@ export function eyeHalfSpread(eyeDistance = 1, hw = 0.34) {
 
 /**
  * Max eyeDistance so eyes stay on the front of the face (not wrapping to the side/back).
- * Pass faceOpts ({ hw, hh, hd, headY, roundness }) to tighten via SDF front surface.
+ * Pass faceOpts ({ hw, hh, hd, headY, roundness, eyeDrop }) to tighten via SDF front surface.
  */
 export function maxEyeDistanceForWidth(hw = 0.34, faceOpts = null) {
   const w = hw || 0.34;
@@ -42,7 +114,7 @@ export function maxEyeDistanceForWidth(hw = 0.34, faceOpts = null) {
       const hd = faceOpts.hd ?? 0.18;
       const headY = faceOpts.headY ?? 0;
       const hh = faceOpts.hh ?? 0.16;
-      const y = headY + hh * 0.08;
+      const y = faceEyeY(headY, hh, faceOpts.eyeDrop ?? 0.35);
       const midZ = probe(0, y);
       const minFrontZ = Math.max(hd * 0.12, midZ * 0.55);
       let lo = 0;
@@ -133,7 +205,9 @@ export const HAIR_LONG = [
   "pigtails",
 ];
 export const HAIR_STYLES = [...HAIR_SHORT, ...HAIR_LONG];
-export const HAT_STYLES = ["none", "cap", "beanie", "visor", "hardhat", "bowler", "sunhat", "roundcap"];
+export const HAT_STYLES = ["none", "cone", "cap", "beanie", "visor", "hardhat", "bowler", "sunhat", "roundcap"];
+export const BUTTON_SIZE_MIN = 0.8;
+export const BUTTON_SIZE_MAX = 2.4;
 export const TOP_STYLES = ["tee", "polo", "hoodie", "jacket", "overalls"];
 export const BOTTOM_STYLES = ["pants", "shorts", "mini-shorts", "mini-skirt"];
 export const SHOE_STYLES = ["sneaker", "boot", "slippers", "loafer", "hi-top"];
@@ -177,7 +251,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   scale: 1,
   height: { leg: 1, torso: 1, neck: 1, head: 1 },
   body: { hipThick: 1, armThick: 1, legThick: 1 },
-  face: { eyeDistance: 1, roundness: 1, length: 1, width: 1 },
+  face: { eyeDistance: 1, roundness: 1, length: 1, width: 0.92, eyeDrop: 0.35, noseDrop: 0.5 },
   eyes: { style: "oval", color: 0x2a3a4a, scale: 1 },
   brows: { style: "straight", scale: 1 },
   nose: { style: "button", scale: 1 },
@@ -189,6 +263,8 @@ export const DEFAULT_CONFIG = Object.freeze({
       style: "tee",
       color: 0x3d8f6e,
       pattern: { ...SOLID_PATTERN },
+      buttons: 3,
+      buttonSize: 1.4,
     },
     bottom: {
       style: "pants",
@@ -224,6 +300,7 @@ export function resolveConfig(partial = {}) {
   delete cfg.gender;
   if (cfg.face) {
     cfg.face.eyeDistance = clampEyeDistance(cfg.face.eyeDistance);
+    clampFaceFeatureDrops(cfg.face);
   }
   if (cfg.eyes) {
     cfg.eyes.scale = clampEyeScale(cfg.eyes.scale, cfg.face?.eyeDistance);
@@ -280,7 +357,9 @@ export function randomConfig(seed = Math.random()) {
       eyeDistance: 0.45 + rnd() * (2.1 - 0.45),
       roundness: 0.45 + rnd() * (1.25 - 0.45),
       length: 0.65 + rnd() * (2 - 0.65),
-      width: 0.75 + rnd() * (1.35 - 0.75),
+      width: FACE_WIDTH_MIN + rnd() * (FACE_WIDTH_MAX - FACE_WIDTH_MIN),
+      eyeDrop: FACE_DROP_MIN + rnd() * (FACE_DROP_MAX - FACE_DROP_MIN),
+      noseDrop: FACE_DROP_MIN + rnd() * (FACE_DROP_MAX - FACE_DROP_MIN),
     },
     body: {
       hipThick: 0.95 + rnd() * 1.1,
@@ -303,6 +382,7 @@ export function randomConfig(seed = Math.random()) {
         color: hex(),
         pattern: randomPattern(rnd, hex),
         buttons: 2 + Math.floor(rnd() * 4), // 2–5 (used by polo / jacket)
+        buttonSize: BUTTON_SIZE_MIN + rnd() * (BUTTON_SIZE_MAX - BUTTON_SIZE_MIN),
       },
       bottom: {
         style: pick(BOTTOM_STYLES),

@@ -283,15 +283,11 @@ export function createPatternTexture(opts = {}) {
   return tex;
 }
 
-/** Cloth / shoe material — solid or patterned overlay (same recipe as avatarbuilder). */
+/** Cloth / shoe material — unlit flat color (no lighting gradients). */
 export function clothMaterial(color, pattern = {}) {
   const type = pattern.type || "solid";
   if (type === "solid") {
-    return new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.72,
-      metalness: 0.05,
-    });
+    return new THREE.MeshBasicMaterial({ color });
   }
   // Base color is baked into the canvas; keep material.color white so the map reads true
   const map = createPatternTexture({
@@ -303,26 +299,16 @@ export function clothMaterial(color, pattern = {}) {
     rotation: pattern.rotation ?? 0,
   });
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  return new THREE.MeshStandardMaterial({
+  return new THREE.MeshBasicMaterial({
     map,
     color: 0xffffff,
-    roughness: 0.7,
-    metalness: 0.05,
   });
 }
 
 export function skinMaterial(hex) {
-  return new THREE.MeshStandardMaterial({
-    color: hex,
-    roughness: 0.65,
-    metalness: 0.02,
-  });
+  return new THREE.MeshBasicMaterial({ color: hex });
 }
 
-export function basicMat(hex, rough = 0.55) {
-  return new THREE.MeshStandardMaterial({
-    color: hex,
-    roughness: rough,
-    metalness: 0.08,
-  });
+export function basicMat(hex, _rough = 0.55) {
+  return new THREE.MeshBasicMaterial({ color: hex });
 }

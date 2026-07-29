@@ -4,14 +4,21 @@ import { clothMaterial } from "../materials/PatternFactory.js";
 import { buildSmoothTop, buildSmoothBottom } from "../mesh/buildSmoothClothes.js";
 import { buildSmoothShoes } from "../mesh/buildSmoothShoes.js";
 
-/**
- * Full clothing shells (SDF) for tops, bottoms, and shoes.
- */
 function clampButtonCount(n) {
   const v = Math.round(Number(n));
   if (!Number.isFinite(v)) return 3;
   return Math.min(5, Math.max(2, v));
 }
+
+function clampButtonSize(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return 1.4;
+  return Math.min(2.4, Math.max(0.8, v));
+}
+
+/**
+ * Full clothing shells (SDF) for tops, bottoms, and shoes.
+ */
 
 export class Clothes {
   static build(cfg) {
@@ -74,18 +81,23 @@ export class Clothes {
     return g;
   }
 
-  /** Front placket buttons for polo / jacket (2–5). */
-  static addButtons(g, st, count, { yStart, yEnd, size = 0.011, color = 0x1a1a1a } = {}) {
+  /** Front placket buttons for polo / jacket (2–5). Size drives spacing. */
+  static addButtons(g, st, count, { yStart, yEnd, size = 0.016, color = 0x1a1a1a } = {}) {
     const n = clampButtonCount(count);
+    const btnSize = Math.max(0.008, size);
     const btn = clothMaterial(color, { type: "solid" });
     const chestZ = st.L?.chestRZ ?? st.td * 0.5;
-    const btnZ = chestZ + 0.014;
+    const btnZ = chestZ + 0.014 + btnSize * 0.15;
     const top = yStart ?? st.torso.top - 0.035;
-    const bot = yEnd ?? st.torso.y - st.torso.h * 0.12;
+    const botHint = yEnd ?? st.torso.y - st.torso.h * 0.12;
+    // Spacing scales with button size; never tighter than ~2.15× diameter
+    const minSpacing = btnSize * 2.15;
+    const regionSpan = Math.abs(top - botHint);
+    const spacing = n <= 1 ? 0 : Math.max(minSpacing, regionSpan / (n - 1));
+    const depth = Math.max(0.008, btnSize * 0.65);
     for (let i = 0; i < n; i++) {
-      const t = n <= 1 ? 0 : i / (n - 1);
-      const y = top + (bot - top) * t;
-      const m = roundBoxMesh(size, size, 0.008, btn, 0, y, btnZ, 0.003);
+      const y = top - i * spacing;
+      const m = roundBoxMesh(btnSize, btnSize, depth, btn, 0, y, btnZ, btnSize * 0.28);
       m.userData.skinBone = "spine_02";
       g.add(m);
     }
@@ -99,6 +111,8 @@ export class Clothes {
     const st = buildStack(cfg);
     const { hw, hh, hd } = skullSize(cfg, st);
     const topMat = clothMaterial(top.color ?? 0x3d8f6e, top.pattern || {});
+    const btnScale = clampButtonSize(top.buttonSize ?? 1.4);
+    const btnBase = 0.014 * btnScale;
 
     const mesh = buildSmoothTop(topMat, {
       style,
@@ -118,12 +132,12 @@ export class Clothes {
       const collarM = roundBoxMesh(0.08, 0.024, 0.04, collar, 0, st.torso.top - 0.012, 0.055, 0.006);
       collarM.userData.skinBone = "spine_03";
       g.add(collarM);
-      // Short placket under collar
       const n = clampButtonCount(top.buttons ?? 3);
+      const spacing = btnBase * 2.15;
       Clothes.addButtons(g, st, n, {
-        yStart: st.torso.top - 0.038,
-        yEnd: st.torso.top - 0.038 - 0.024 * (n - 1),
-        size: 0.01,
+        yStart: st.torso.top - 0.04,
+        yEnd: st.torso.top - 0.04 - spacing * (n - 1),
+        size: btnBase,
         color: 0x222222,
       });
     } else if (style === "jacket") {
@@ -141,9 +155,9 @@ export class Clothes {
       collarM.userData.skinBone = "spine_03";
       g.add(collarM);
       Clothes.addButtons(g, st, top.buttons ?? 3, {
-        yStart: st.torso.top - 0.04,
+        yStart: st.torso.top - 0.045,
         yEnd: st.torso.y - st.torso.h * 0.1,
-        size: 0.012,
+        size: btnBase * 1.05,
         color: 0x1a1a1a,
       });
     }
