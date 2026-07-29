@@ -70,7 +70,8 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NoToneMapping;
-renderer.shadowMap.enabled = false;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.BasicShadowMap;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xffffff);
@@ -95,8 +96,55 @@ function followAvatarCenter() {
   orbit.target.lerp(_avatarCenter, 0.35);
 }
 
-// Unlit MeshBasic materials — ambient only (directionals unused)
-scene.add(new THREE.AmbientLight(0xffffff, 1));
+/** White disc → transparent rim (easier / cleaner than blur). */
+function makeSoftGroundMap(size = 256) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  const g = ctx.createRadialGradient(size / 2, size / 2, size * 0.22, size / 2, size / 2, size * 0.5);
+  g.addColorStop(0, "rgba(255,255,255,1)");
+  g.addColorStop(0.5, "rgba(255,255,255,0.92)");
+  g.addColorStop(0.78, "rgba(255,255,255,0.35)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+scene.add(new THREE.HemisphereLight(0xffffff, 0xe8e8ec, 0.25));
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
+keyLight.position.set(2.4, 4.2, 3.2);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 0.5;
+keyLight.shadow.camera.far = 22;
+keyLight.shadow.camera.left = -3.5;
+keyLight.shadow.camera.right = 3.5;
+keyLight.shadow.camera.top = 5;
+keyLight.shadow.camera.bottom = -1.5;
+keyLight.shadow.bias = -0.0008;
+keyLight.shadow.normalBias = 0.02;
+scene.add(keyLight);
+const fillLight = new THREE.DirectionalLight(0xffffff, 0.15);
+fillLight.position.set(-2.2, 2.0, 1.2);
+scene.add(fillLight);
+
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(5.5, 64),
+  new THREE.MeshLambertMaterial({
+    color: 0xffffff,
+    map: makeSoftGroundMap(),
+    transparent: true,
+    depthWrite: false,
+  })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+ground.position.y = 0;
+scene.add(ground);
 
 const clock = new THREE.Clock();
 let currentConfig = resolveConfig(randomConfig(Date.now() + Math.random() * 1e9));
@@ -561,6 +609,11 @@ async function rebuildRigged() {
     scene.add(skeletonHelper);
 
     outlineMats = attachMeshOutline(result.group);
+    result.group.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = !o.userData.isOutline;
+      o.receiveShadow = false;
+    });
 
     adaptedClips = getAdaptedClips(sourceClips, result.meta?.totalHeight);
     mixer = new THREE.AnimationMixer(result.group);
