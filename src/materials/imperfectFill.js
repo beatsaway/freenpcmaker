@@ -41,12 +41,17 @@ export function applyImperfectFill(mat) {
       "#include <skinning_vertex>",
       `#include <skinning_vertex>
        {
-         float f = uPaintFrame;
-         float n = fract(sin(dot(transformed.xyz, vec3(12.9898, 78.233, 45.164)) + f * 1.7) * 43758.5453);
-         float n2 = fract(sin(transformed.y * 31.0 + transformed.x * 17.0 + f * 2.3) * 23421.13);
+         float draw = floor(uPaintFrame);
+         float n = fract(sin(dot(transformed.xyz, vec3(12.9898, 78.233, 45.164)) + draw * 1.7) * 43758.5453);
+         float n2 = fract(sin(transformed.y * 31.0 + transformed.x * 17.0 + draw * 2.3) * 23421.13);
          float over = step(0.78, n2);
          float push = mix(-0.015, -0.003, n) + over * (0.01 + n * 0.01);
          transformed += normalize(objectNormal) * push;
+         // Whole-mesh blot hop — same quiet snap family as shadow
+         float jx = fract(sin(draw * 12.9898 + 1.3) * 43758.5453) - 0.5;
+         float jy = fract(sin(draw * 78.233 + 8.1) * 43758.5453) - 0.5;
+         float jz = fract(sin(draw * 45.164 + 3.7) * 19234.67) - 0.5;
+         transformed += vec3(jx, jy * 0.55, jz) * 0.0032;
        }
       `
     );
@@ -64,7 +69,7 @@ export function applyImperfectFill(mat) {
          vec3 nn = normalize(vPaintNormal);
          vec3 vv = normalize(vPaintView);
          float rim = 1.0 - abs(dot(nn, vv));
-         float f = uPaintFrame;
+         float f = floor(uPaintFrame);
          float g = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)) + f * 3.1) * 43758.5453);
          float g2 = fract(sin(gl_FragCoord.x * 0.17 + gl_FragCoord.y * 0.31 + f * 2.0) * 19234.67);
          if (rim > 0.28 && g > mix(0.72, 0.45, rim)) discard;
@@ -73,6 +78,6 @@ export function applyImperfectFill(mat) {
        #include <opaque_fragment>`
     );
   };
-  mat.customProgramCacheKey = () => "imperfect-hand-fill-v2";
+  mat.customProgramCacheKey = () => "imperfect-hand-fill-v3-blot";
   return mat;
 }
