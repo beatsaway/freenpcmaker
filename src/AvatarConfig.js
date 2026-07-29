@@ -8,9 +8,17 @@ export const GENDERS = [];
 export const BODY_SHAPES = ["slim", "regular", "stocky"];
 export const EYE_STYLES = ["oval", "almond", "wide"];
 export const EYE_SCALE_MIN = 0.6;
-export const EYE_SCALE_MAX = 2.8; // doubled from 1.4
+export const EYE_SCALE_MAX = 1.55;
 export const EYE_DISTANCE_MIN = 0.45;
 export const EYE_DISTANCE_MAX = 3.6;
+/** Min clear space between inner eye edges (world units at ref skull). */
+export const EYE_GAP_MIN = 0.02;
+/** Pupil/iris size as a fraction of the eye sclera (how big pupils can get). */
+export const PUPIL_SCALE_MIN = 0.28;
+export const PUPIL_SCALE_MAX = 0.78;
+/** Pupil look within eye white (−1…1, left/right and down/up). */
+export const PUPIL_LOOK_MIN = -1;
+export const PUPIL_LOOK_MAX = 1;
 /** Face width slider — multiplies skull half-width (hw). */
 export const FACE_WIDTH_MIN = 0.65;
 export const FACE_WIDTH_MAX = 1.12;
@@ -131,12 +139,25 @@ export function maxEyeDistanceForWidth(hw = 0.34, faceOpts = null) {
   return Math.min(EYE_DISTANCE_MAX, Math.max(EYE_DISTANCE_MIN, maxX / base));
 }
 
-/** Clamp eyeDistance to the front-face max for this skull width. */
+/** Clamp eyeDistance to front-face max and eye-size min gap. */
 export function clampEyeDistance(eyeDistance, hw = 0.34, faceOpts = null) {
-  const hi = maxEyeDistanceForWidth(hw, faceOpts);
+  const lo = minEyeDistanceForScale(faceOpts?.eyeScale ?? 1, hw);
+  const hi = Math.max(lo, maxEyeDistanceForWidth(hw, faceOpts));
   const v = Number(eyeDistance);
-  if (!Number.isFinite(v)) return Math.min(1, hi);
-  return Math.min(hi, Math.max(EYE_DISTANCE_MIN, v));
+  if (!Number.isFinite(v)) return Math.min(Math.max(1, lo), hi);
+  return Math.min(hi, Math.max(lo, v));
+}
+
+/**
+ * Min eyeDistance so left/right eyes keep EYE_GAP_MIN between inner edges
+ * for the given eye scale (bigger eyes → cannot sit as close).
+ */
+export function minEyeDistanceForScale(eyeScale = 1, hw = 0.34) {
+  const sc = Math.min(EYE_SCALE_MAX, Math.max(EYE_SCALE_MIN, Number(eyeScale) || 1));
+  const base = EYE_SPREAD_AT_1 * ((hw || 0.34) / 0.34);
+  if (base < 1e-8) return EYE_DISTANCE_MIN;
+  const minDist = (2 * EYE_HALF_AT_1 * sc + EYE_GAP_MIN) / (2 * base);
+  return Math.min(EYE_DISTANCE_MAX, Math.max(EYE_DISTANCE_MIN, minDist));
 }
 
 /**
@@ -146,8 +167,7 @@ export function clampEyeDistance(eyeDistance, hw = 0.34, faceOpts = null) {
 export function maxEyeScaleForDistance(eyeDistance = 1, hw = 0.34) {
   const dist = Math.min(EYE_DISTANCE_MAX, Math.max(EYE_DISTANCE_MIN, Number(eyeDistance) || 1));
   const baseSpread = eyeHalfSpread(dist, hw);
-  const gap = 0.012; // min clear space between inner edges
-  const maxFromDist = (2 * baseSpread - gap) / (2 * EYE_HALF_AT_1);
+  const maxFromDist = (2 * baseSpread - EYE_GAP_MIN) / (2 * EYE_HALF_AT_1);
   return Math.min(EYE_SCALE_MAX, Math.max(EYE_SCALE_MIN, maxFromDist));
 }
 
@@ -157,6 +177,20 @@ export function clampEyeScale(scale, eyeDistance = 1, hw = 0.34) {
   const v = Number(scale);
   if (!Number.isFinite(v)) return Math.min(1, hi);
   return Math.min(hi, Math.max(lo, v));
+}
+
+/** Clamp pupil/iris fraction of the eye (PUPIL_SCALE_MIN…PUPIL_SCALE_MAX). */
+export function clampPupilScale(scale) {
+  const v = Number(scale);
+  if (!Number.isFinite(v)) return 0.55;
+  return Math.min(PUPIL_SCALE_MAX, Math.max(PUPIL_SCALE_MIN, v));
+}
+
+/** Clamp pupil X/Y look within eye white (−1…1). */
+export function clampPupilLook(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(PUPIL_LOOK_MAX, Math.max(PUPIL_LOOK_MIN, n));
 }
 
 /** Head size (height.head) — min doubled from 0.5, max +30% from 1.7. */
@@ -252,7 +286,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   height: { leg: 1, torso: 1, neck: 1, head: 1 },
   body: { hipThick: 1, armThick: 1, legThick: 1 },
   face: { eyeDistance: 1, roundness: 1, length: 1, width: 0.92, eyeDrop: 0.35, noseDrop: 0.5 },
-  eyes: { style: "oval", color: 0x2a3a4a, scale: 1 },
+  eyes: { style: "oval", color: 0x2a3a4a, scale: 1, pupilScale: 0.55, pupilX: 0, pupilY: 0 },
   brows: { style: "straight", scale: 1 },
   nose: { style: "button", scale: 1 },
   ears: { style: "round", scale: 1 },
@@ -265,6 +299,7 @@ export const DEFAULT_CONFIG = Object.freeze({
       pattern: { ...SOLID_PATTERN },
       buttons: 3,
       buttonSize: 1.4,
+      buttonColor: 0x222222,
     },
     bottom: {
       style: "pants",
@@ -299,11 +334,16 @@ export function resolveConfig(partial = {}) {
   if (cfg.clothes?.top?.style === "tank") cfg.clothes.top.style = "overalls";
   delete cfg.gender;
   if (cfg.face) {
-    cfg.face.eyeDistance = clampEyeDistance(cfg.face.eyeDistance);
+    cfg.face.eyeDistance = clampEyeDistance(cfg.face.eyeDistance, 0.34, {
+      eyeScale: cfg.eyes?.scale ?? 1,
+    });
     clampFaceFeatureDrops(cfg.face);
   }
   if (cfg.eyes) {
     cfg.eyes.scale = clampEyeScale(cfg.eyes.scale, cfg.face?.eyeDistance);
+    cfg.eyes.pupilScale = clampPupilScale(cfg.eyes.pupilScale);
+    cfg.eyes.pupilX = clampPupilLook(cfg.eyes.pupilX);
+    cfg.eyes.pupilY = clampPupilLook(cfg.eyes.pupilY);
   }
   return cfg;
 }
@@ -370,6 +410,10 @@ export function randomConfig(seed = Math.random()) {
       style: pick(EYE_STYLES),
       color: pick([0x2a3a4a, 0x3a5a2a, 0x4a6a9a, 0x5a3a2a]),
       scale: 0.7 + rnd() * 1.5,
+      pupilScale: PUPIL_SCALE_MIN + rnd() * (PUPIL_SCALE_MAX - PUPIL_SCALE_MIN),
+      // Mild look bias — full −1…1 still available on sliders
+      pupilX: (rnd() - 0.5) * 1.4,
+      pupilY: (rnd() - 0.5) * 1.0,
     },
     brows: { style: pick(BROW_STYLES), scale: 0.85 + rnd() * 0.3 },
     nose: { style: pick(NOSE_STYLES), scale: 0.85 + rnd() * 0.35 },
@@ -383,6 +427,7 @@ export function randomConfig(seed = Math.random()) {
         pattern: randomPattern(rnd, hex),
         buttons: 2 + Math.floor(rnd() * 4), // 2–5 (used by polo / jacket)
         buttonSize: BUTTON_SIZE_MIN + rnd() * (BUTTON_SIZE_MAX - BUTTON_SIZE_MIN),
+        buttonColor: pick([0x1a1a1a, 0x222222, 0xf5f0e6, 0xc4a35a, 0x8a3030, 0x3d5a8f, 0xffffff, hex()]),
       },
       bottom: {
         style: pick(BOTTOM_STYLES),

@@ -14,15 +14,21 @@ import {
   randomConfig,
   resolveConfig,
   maxEyeScaleForDistance,
+  minEyeDistanceForScale,
   clampEyeScale,
   clampEyeDistance,
+  clampPupilScale,
+  clampPupilLook,
   maxEyeDistanceForWidth,
   applyEyeDistanceCap,
   skullSize,
   encodeLookCode,
   applyLookCode,
   EYE_SCALE_MIN,
-  EYE_DISTANCE_MIN,
+  PUPIL_SCALE_MIN,
+  PUPIL_SCALE_MAX,
+  PUPIL_LOOK_MIN,
+  PUPIL_LOOK_MAX,
   FACE_WIDTH_MIN,
   FACE_WIDTH_MAX,
   FACE_DROP_MIN,
@@ -35,6 +41,7 @@ import {
   HEAD_SCALE_MIN,
   HEAD_SCALE_MAX,
 } from "../src/index.js";
+import { attachMeshOutline, tickMeshOutline } from "../src/materials/glitchWire.js";
 
 const lookCodeEl = document.getElementById("look-code");
 const btnLookCopy = document.getElementById("btn-look-copy");
@@ -91,13 +98,6 @@ function followAvatarCenter() {
 // Unlit MeshBasic materials — ambient only (directionals unused)
 scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-const floor = new THREE.Mesh(
-  new THREE.CircleGeometry(4.5, 64),
-  new THREE.MeshBasicMaterial({ color: 0xf0f0f2 })
-);
-floor.rotation.x = -Math.PI / 2;
-scene.add(floor);
-
 const clock = new THREE.Clock();
 let currentConfig = resolveConfig(randomConfig(Date.now() + Math.random() * 1e9));
 let rigged = null;
@@ -109,6 +109,7 @@ let playing = true;
 /** Animation playback rate — default 50% */
 let animSpeed = 0.5;
 let skeletonHelper = null;
+let outlineMats = [];
 let busy = false;
 /** Currently previewing clip name */
 let currentClipName = "";
@@ -144,6 +145,9 @@ const RANDOM_PATHS = [
   "eyes.style",
   "eyes.color",
   "eyes.scale",
+  "eyes.pupilScale",
+  "eyes.pupilX",
+  "eyes.pupilY",
   "brows.style",
   "nose.style",
   "ears.style",
@@ -156,6 +160,7 @@ const RANDOM_PATHS = [
   "clothes.top.pattern",
   "clothes.top.buttons",
   "clothes.top.buttonSize",
+  "clothes.top.buttonColor",
   "clothes.bottom.style",
   "clothes.bottom.color",
   "clothes.shoes.style",
@@ -272,9 +277,19 @@ function clearRigged() {
     scene.remove(skeletonHelper);
     skeletonHelper = null;
   }
+  outlineMats = [];
   mixer = null;
   action = null;
   rigged = null;
+}
+
+/** Clips that leave the NPC lying flat / airborne — skip for Lucky Roll only. */
+const LUCKY_ANIM_SKIP =
+  /death|sleeping|crawl|flying|glide|levitat|swim|push.?up|lay\s*to|slide|dodge/i;
+
+function luckyRollClips(clips) {
+  const ok = clips.filter((c) => !LUCKY_ANIM_SKIP.test(c.name));
+  return ok.length ? ok : clips;
 }
 
 function populateAnimSelect(preferName) {
@@ -284,7 +299,8 @@ function populateAnimSelect(preferName) {
     return;
   }
   if (preferName === "random" && adaptedClips.length) {
-    currentClipName = adaptedClips[Math.floor(Math.random() * adaptedClips.length)].name;
+    const pool = luckyRollClips(adaptedClips);
+    currentClipName = pool[Math.floor(Math.random() * pool.length)].name;
   } else if (preferName && adaptedClips.some((c) => c.name === preferName)) {
     currentClipName = preferName;
   } else if (currentClipName && adaptedClips.some((c) => c.name === currentClipName)) {
@@ -544,6 +560,8 @@ async function rebuildRigged() {
     skeletonHelper.visible = false;
     scene.add(skeletonHelper);
 
+    outlineMats = attachMeshOutline(result.group);
+
     adaptedClips = getAdaptedClips(sourceClips, result.meta?.totalHeight);
     mixer = new THREE.AnimationMixer(result.group);
     populateAnimSelect(prevAnim);
@@ -667,10 +685,12 @@ function buildLookControls() {
   section("Face");
   if (!c.face) c.face = { eyeDistance: 1, roundness: 1, length: 1, width: 0.92, eyeDrop: 0.35, noseDrop: 0.5 };
   {
-    const eyeDistMax = maxEyeDistanceForWidth(skullSize(c).hw);
-    rangeField("Eye distance", EYE_DISTANCE_MIN, eyeDistMax, 0.05, () => c.face.eyeDistance ?? 1, (v) => {
-      c.face.eyeDistance = clampEyeDistance(v, skullSize(c).hw);
-      c.eyes.scale = clampEyeScale(c.eyes.scale, c.face.eyeDistance, skullSize(c).hw);
+    const hw = skullSize(c).hw;
+    const eyeDistMin = minEyeDistanceForScale(c.eyes?.scale ?? 1, hw);
+    const eyeDistMax = Math.max(eyeDistMin, maxEyeDistanceForWidth(hw));
+    rangeField("Eye distance", eyeDistMin, eyeDistMax, 0.05, () => c.face.eyeDistance ?? 1, (v) => {
+      c.face.eyeDistance = clampEyeDistance(v, hw, { eyeScale: c.eyes?.scale ?? 1 });
+      c.eyes.scale = clampEyeScale(c.eyes.scale, c.face.eyeDistance, hw);
       buildLookControls();
     }, "face.eyeDistance");
   }
@@ -690,11 +710,24 @@ function buildLookControls() {
   selectField("Eyes", cat.eyeStyles, () => c.eyes.style, (v) => { c.eyes.style = v; }, "eyes.style");
   colorField("Eye color", () => c.eyes.color, (v) => { c.eyes.color = v; }, "eyes.color");
   {
-    const eyeMax = maxEyeScaleForDistance(c.face.eyeDistance ?? 1);
-    rangeField("Eye scale", EYE_SCALE_MIN, eyeMax, 0.05, () => clampEyeScale(c.eyes.scale, c.face.eyeDistance ?? 1), (v) => {
-      c.eyes.scale = clampEyeScale(v, c.face.eyeDistance ?? 1);
+    const hw = skullSize(c).hw;
+    const eyeMax = maxEyeScaleForDistance(c.face.eyeDistance ?? 1, hw);
+    rangeField("Eye scale", EYE_SCALE_MIN, eyeMax, 0.05, () => clampEyeScale(c.eyes.scale, c.face.eyeDistance ?? 1, hw), (v) => {
+      c.eyes.scale = clampEyeScale(v, c.face.eyeDistance ?? 1, hw);
+      // Bigger eyes raise the min gap — push distance out if needed
+      c.face.eyeDistance = clampEyeDistance(c.face.eyeDistance, hw, { eyeScale: c.eyes.scale });
+      buildLookControls();
     }, "eyes.scale");
   }
+  rangeField("Pupil size", PUPIL_SCALE_MIN, PUPIL_SCALE_MAX, 0.02, () => clampPupilScale(c.eyes.pupilScale ?? 0.55), (v) => {
+    c.eyes.pupilScale = clampPupilScale(v);
+  }, "eyes.pupilScale");
+  rangeField("Pupil X", PUPIL_LOOK_MIN, PUPIL_LOOK_MAX, 0.05, () => clampPupilLook(c.eyes.pupilX ?? 0), (v) => {
+    c.eyes.pupilX = clampPupilLook(v);
+  }, "eyes.pupilX");
+  rangeField("Pupil Y", PUPIL_LOOK_MIN, PUPIL_LOOK_MAX, 0.05, () => clampPupilLook(c.eyes.pupilY ?? 0), (v) => {
+    c.eyes.pupilY = clampPupilLook(v);
+  }, "eyes.pupilY");
   if (!c.brows) c.brows = { style: "straight", scale: 1 };
   selectField("Brows", cat.browStyles, () => c.brows.style, (v) => { c.brows.style = v; }, "brows.style");
   selectField("Nose", cat.noseStyles, () => c.nose.style, (v) => { c.nose.style = v; }, "nose.style");
@@ -713,8 +746,10 @@ function buildLookControls() {
   if (c.clothes.top.style === "polo" || c.clothes.top.style === "jacket") {
     if (c.clothes.top.buttons == null) c.clothes.top.buttons = 3;
     if (c.clothes.top.buttonSize == null) c.clothes.top.buttonSize = 1.4;
+    if (c.clothes.top.buttonColor == null) c.clothes.top.buttonColor = 0x222222;
     rangeField("Buttons", 2, 5, 1, () => c.clothes.top.buttons ?? 3, (v) => { c.clothes.top.buttons = Math.round(v); }, "clothes.top.buttons");
     rangeField("Button size", BUTTON_SIZE_MIN, BUTTON_SIZE_MAX, 0.05, () => c.clothes.top.buttonSize ?? 1.4, (v) => { c.clothes.top.buttonSize = v; }, "clothes.top.buttonSize");
+    colorField("Button color", () => c.clothes.top.buttonColor ?? 0x222222, (v) => { c.clothes.top.buttonColor = v; }, "clothes.top.buttonColor");
   }
 
   section("Clothes · bottom");
@@ -855,6 +890,7 @@ function tick() {
   requestAnimationFrame(tick);
   const dt = clock.getDelta();
   if (mixer) mixer.update(dt);
+  tickMeshOutline(outlineMats, clock.elapsedTime);
   followAvatarCenter();
   orbit.update();
   renderer.render(scene, camera);

@@ -225,8 +225,8 @@ canvas {
   width: auto;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: 2px;
+  padding: 4px 6px;
   cursor: pointer;
   font-family: Orbitron, sans-serif;
   font-size: 9px;
@@ -248,11 +248,20 @@ canvas {
 }
 .dock-tab .sum-star {
   flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
-  font-size: 10px;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  font-size: 9px;
   padding: 0;
   margin: 0;
+  border: none;
+  border-radius: 0;
+  line-height: 1;
+  letter-spacing: 0;
+}
+.dock-tab .sum-star:hover {
+  border: none;
+  background: transparent;
 }
 .dock-tab .sum-action {
   flex: 0 0 auto;

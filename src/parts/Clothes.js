@@ -138,7 +138,7 @@ export class Clothes {
         yStart: st.torso.top - 0.04,
         yEnd: st.torso.top - 0.04 - spacing * (n - 1),
         size: btnBase,
-        color: 0x222222,
+        color: top.buttonColor ?? 0x222222,
       });
     } else if (style === "jacket") {
       const accent = clothMaterial(top.pattern?.color2 ?? 0xffffff, { type: "solid" });
@@ -158,7 +158,7 @@ export class Clothes {
         yStart: st.torso.top - 0.045,
         yEnd: st.torso.y - st.torso.h * 0.1,
         size: btnBase * 1.05,
-        color: 0x1a1a1a,
+        color: top.buttonColor ?? 0x1a1a1a,
       });
     }
     return g;

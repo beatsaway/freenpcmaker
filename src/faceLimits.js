@@ -23,9 +23,17 @@ export function applyEyeDistanceCap(cfg) {
     ...faceOpts,
     frontZ: (x, y) => faceSurfaceZFromSdf(x, y, faceOpts, 0),
   };
-  cfg.face.eyeDistance = clampEyeDistance(cfg.face.eyeDistance ?? 1, sk.hw, probeOpts);
+  cfg.face.eyeDistance = clampEyeDistance(cfg.face.eyeDistance ?? 1, sk.hw, {
+    ...probeOpts,
+    eyeScale: cfg.eyes?.scale ?? 1,
+  });
   if (cfg.eyes) {
     cfg.eyes.scale = clampEyeScale(cfg.eyes.scale, cfg.face.eyeDistance, sk.hw);
+    // Keep gap after scale clamp (big eyes push distance out)
+    cfg.face.eyeDistance = clampEyeDistance(cfg.face.eyeDistance, sk.hw, {
+      ...probeOpts,
+      eyeScale: cfg.eyes.scale,
+    });
   }
   return cfg;
 }

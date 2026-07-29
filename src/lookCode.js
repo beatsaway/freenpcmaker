@@ -87,13 +87,13 @@ export function encodeLookCode(cfg = {}, anim = {}) {
     hex6(c.skinTone),
     [c.height?.leg, c.height?.torso, c.height?.neck, c.height?.head, c.body?.armThick, c.body?.legThick, c.body?.hipThick].map(f2).join(" "),
     [c.face?.eyeDistance, c.face?.roundness, c.face?.length, c.face?.width, c.face?.eyeDrop, c.face?.noseDrop].map(f2).join(" "),
-    `${idx(EYE_STYLES, c.eyes?.style)} ${hex6(c.eyes?.color)} ${f2(c.eyes?.scale)}`,
+    `${idx(EYE_STYLES, c.eyes?.style)} ${hex6(c.eyes?.color)} ${f2(c.eyes?.scale)} ${f2(c.eyes?.pupilScale ?? 0.55)} ${f2(c.eyes?.pupilX ?? 0)} ${f2(c.eyes?.pupilY ?? 0)}`,
     String(idx(BROW_STYLES, c.brows?.style)),
     String(idx(NOSE_STYLES, c.nose?.style)),
     String(idx(EAR_STYLES, c.ears?.style)),
     `${idx(HAIR_STYLES, c.hair?.style)} ${hex6(c.hair?.color)}`,
     `${idx(HAT_STYLES, c.hat?.style)} ${hex6(c.hat?.color)}`,
-    `${idx(TOP_STYLES, c.clothes?.top?.style)} ${hex6(c.clothes?.top?.color)} ${idx(PATTERN_TYPES, topPat)} ${Math.min(5, Math.max(2, Math.round(c.clothes?.top?.buttons ?? 3)))} ${f2(c.clothes?.top?.buttonSize ?? 1.4)}`,
+    `${idx(TOP_STYLES, c.clothes?.top?.style)} ${hex6(c.clothes?.top?.color)} ${idx(PATTERN_TYPES, topPat)} ${Math.min(5, Math.max(2, Math.round(c.clothes?.top?.buttons ?? 3)))} ${f2(c.clothes?.top?.buttonSize ?? 1.4)} ${hex6(c.clothes?.top?.buttonColor ?? 0x222222)}`,
     `${idx(BOTTOM_STYLES, c.clothes?.bottom?.style)} ${hex6(c.clothes?.bottom?.color)}`,
     `${idx(SHOE_STYLES, c.clothes?.shoes?.style)} ${hex6(c.clothes?.shoes?.color)}`,
   ];
@@ -149,6 +149,9 @@ function partialFromMap(map, anim) {
       style: pick(EYE_STYLES, e[0]),
       color: parseHex(e[1]) ?? 0x2a3a4a,
       scale: num(e[2], 1),
+      pupilScale: num(e[3], 0.55),
+      pupilX: num(e[4], 0),
+      pupilY: num(e[5], 0),
     };
   }
 
@@ -185,6 +188,7 @@ function partialFromMap(map, anim) {
       },
       buttons: Math.min(5, Math.max(2, Math.round(num(t[3], 3)))),
       buttonSize: Math.min(2.4, Math.max(0.8, num(t[4], 1.4))),
+      buttonColor: parseHex(t[5]) ?? 0x222222,
     };
   }
 
