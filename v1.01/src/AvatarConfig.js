@@ -68,14 +68,15 @@ export function faceSkullSpan(faceOpts = null, headY = 0, hh = 0.1) {
 /**
  * Eyes — Y is the lower end of the eye (bottom of sclera), not the center.
  * eyeDrop 0 = a bit higher, 1 = a bit lower (small nudge around the ideal).
- * Ideal sits slightly above face mid (upper half of crown→chin).
+ * Ideal: sclera centers sit on the crown→chin midpoint (Loomis eye line).
+ * (Bottom is a half-eye below mid so the visual center reads as mid-head.)
  */
 export function faceEyeY(headY, hh, eyeDrop = 0.5, faceOpts = null) {
   const { midY, span } = faceSkullSpan(faceOpts, headY, hh);
   const u = clamp01(eyeDrop, 0.5);
-  // ~58% up from chin toward crown (above mid), then small drop nudge
-  const ideal = midY + span * 0.08;
-  return ideal + span * mix(0.06, -0.06, u);
+  // Eye bottoms just under mid → centers ≈ midY (was mid+8%, which sat too high)
+  const ideal = midY - span * 0.04;
+  return ideal + span * mix(0.05, -0.05, u);
 }
 
 /**
@@ -85,34 +86,41 @@ export function faceEyeCenterY(headY, hh, eyeDrop = 0.5, faceOpts = null) {
   const { span } = faceSkullSpan(faceOpts, headY, hh);
   const bottom = faceEyeY(headY, hh, eyeDrop, faceOpts);
   // Typical half-height of default oval white ≈ 0.035–0.045 of face span
-  return bottom + span * 0.045;
+  return bottom + span * 0.04;
 }
 
 /**
- * Nose tip Y — between eye centers and chin tip, slightly closer to eyes.
- * Uses mesh chin/crown from faceOpts when provided.
+ * Nose tip Y — between eye centers and chin tip, nearer the eyes than the chin.
+ * With eyes on the mid-line this lands in the old (too-high) eye band — mid-face.
+ *
+ * Why mouth can look OK while eyes/nose look high: nested midpoints damp error
+ * toward the chin (~62% retained at nose, ~32% at mouth), so a high eye baseline
+ * hurts eyes most, nose next, and mouth least.
  */
 export function faceNoseY(headY, hh, noseDrop = 0.5, faceOpts = null) {
   const eyeC = faceEyeCenterY(headY, hh, faceOpts?.eyeDrop ?? 0.5, faceOpts);
   const { chinY } = faceSkullSpan(faceOpts, headY, hh);
-  // ~0.38 of the way eye-center → chin (reads mid-face, not glued to eyes)
-  const ideal = mix(eyeC, chinY, 0.38);
+  // ~0.30 of eye→chin — sits where the old high eye line used to read
+  const ideal = mix(eyeC, chinY, 0.3);
   const u = clamp01(noseDrop, 0.5);
-  const room = Math.max(0.003, (eyeC - chinY) * 0.12);
+  const room = Math.max(0.003, (eyeC - chinY) * 0.1);
   return ideal + mix(room, -room, u);
 }
 
 /**
- * Mouth center Y — between nose tip and chin, nearer the middle of that gap
- * so lips clear the chin tip on the SDF jaw.
+ * Mouth center Y — between nose tip and chin.
+ * Soft-anchored to a chin-relative band so lowering eyes/nose doesn't drag lips
+ * (users already read the current mouth band as correct).
  */
 export function faceMouthY(headY, hh, mouthDrop = 0.5, faceOpts = null) {
   const noseTipY = faceNoseY(headY, hh, faceOpts?.noseDrop ?? 0.5, faceOpts);
-  const { chinY } = faceSkullSpan(faceOpts, headY, hh);
-  // 0.48 of nose→chin — keeps a clear pad above the chin tip
-  const ideal = mix(noseTipY, chinY, 0.48);
+  const { chinY, span } = faceSkullSpan(faceOpts, headY, hh);
+  const chained = mix(noseTipY, chinY, 0.48);
+  // ~22% of skull span above chin — classic lower-third mouth band
+  const anchored = chinY + span * 0.22;
+  const ideal = mix(chained, anchored, 0.55);
   const u = clamp01(mouthDrop, 0.5);
-  const room = Math.max(0.0025, (noseTipY - chinY) * 0.12);
+  const room = Math.max(0.0025, (noseTipY - chinY) * 0.1);
   return ideal + mix(room, -room, u);
 }
 

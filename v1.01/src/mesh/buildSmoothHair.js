@@ -82,19 +82,39 @@ function hash01(i, salt = 0) {
 /**
  * Style macros — hang lengths use hangTo(targetY, cover) so tips actually reach
  * chin / shoulder / chest / waist after cover truncates the bowl rim.
- * Front bangs are capped above the eyes. Volume = extra meshes on the bowl, not longer hang.
+ * Front bangs are capped above the eyes.
+ * Shape knobs (flare / peel / curl / tipTaper / waveFreq) give each style a readable silhouette.
  */
 function styleMacro(style, L) {
   const R = L.R;
   const { hangTo, chinY, shoulderY, chestY, waistY, eyeY } = L;
-  // Front tips stop at the brow band — never hang over the sclera
   const browClear = eyeY + R * 0.38;
 
-  const all = (len, wave = 0, vary = 0.15, cover = 1, coverVary = 0.06) => ({
-    front: { len, wave, vary, cover, coverVary },
-    right: { len, wave, vary, cover, coverVary },
-    back: { len, wave, vary, cover, coverVary },
-    left: { len, wave, vary, cover, coverVary },
+  const sh = (o = {}) => ({
+    flare: o.flare ?? 0.045,
+    peel: o.peel ?? 0,
+    curl: o.curl ?? 0,
+    curlFreq: o.curlFreq ?? 3.2,
+    tipTaper: o.tipTaper ?? 0.12,
+    waveFreq: o.waveFreq ?? 1.4,
+    // Non-bowl crown: peak lifts apex, flat squashes top, sideBulge fattens temples
+    crownPeak: o.crownPeak ?? 0,
+    crownFlat: o.crownFlat ?? 0,
+    sideBulge: o.sideBulge ?? 0,
+  });
+  const reg = (len, wave, vary, cover, coverVary, shape = {}) => ({
+    len,
+    wave,
+    vary,
+    cover,
+    coverVary,
+    ...sh(shape),
+  });
+  const all = (len, wave = 0, vary = 0.15, cover = 1, coverVary = 0.06, shape = {}) => ({
+    front: reg(len, wave, vary, cover, coverVary, shape),
+    right: reg(len, wave, vary, cover, coverVary, shape),
+    back: reg(len, wave, vary, cover, coverVary, shape),
+    left: reg(len, wave, vary, cover, coverVary, shape),
   });
   const sides = (len, wave = 0.1, cards = 3, width = R * 0.14) => ({
     cards,
@@ -102,252 +122,353 @@ function styleMacro(style, L) {
     wave,
     width,
   });
-  /** Short forehead fringe — cover stops high, hang ends above eyes. */
-  const fringe = (wave = 0.05, vary = 0.06, cover = 0.42) => ({
-    len: hangTo(browClear, cover),
-    wave,
-    vary: Math.min(vary, 0.18),
-    cover,
-    coverVary: 0.04,
-  });
+  /**
+   * Front fringe. shape.part: "mid" | "sideL" | "sideR" | "none"
+   * shape.feel: "tidy" | "fluffy" | "curtain" (affects coverVary / hang falloff)
+   */
+  const fringe = (wave = 0.05, vary = 0.06, cover = 0.42, shape = {}) => {
+    const feel = shape.feel || "tidy";
+    const coverVary = feel === "fluffy" ? 0.12 : feel === "curtain" ? 0.06 : 0.025;
+    const hangVary = feel === "fluffy" ? Math.min(vary * 1.4, 0.28) : Math.min(vary, 0.16);
+    return {
+      ...reg(hangTo(browClear, cover), wave, hangVary, cover, coverVary, shape),
+      part: shape.part || "none",
+      feel,
+    };
+  };
 
   switch (style) {
     case "buzz":
       return {
-        ...all(0, 0, 0, 0.22, 0.03),
-        extras: { kind: "crownVolume", size: R * 0.1, lift: 0.35 },
+        ...all(0, 0, 0, 0.18, 0.02, { flare: 0.02, tipTaper: 0, crownFlat: 0.08 }),
+        bowlScale: 1.01,
+        extras: { kind: "crownVolume", size: R * 0.06, lift: 0.12, sheets: 3, bias: "flat" },
       };
     case "crew":
       return {
-        front: fringe(0, 0.04, 0.2),
-        right: { len: hangTo(mix(eyeY, chinY, 0.35), 0.42), wave: 0, vary: 0.1, cover: 0.42, coverVary: 0.05 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.55), 0.5), wave: 0, vary: 0.1, cover: 0.5, coverVary: 0.05 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.35), 0.42), wave: 0, vary: 0.1, cover: 0.42, coverVary: 0.05 },
+        front: fringe(0.02, 0.04, 0.26, { flare: 0.02, feel: "tidy", part: "none", crownFlat: 0.06 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.25), 0.38), 0, 0.08, 0.38, 0.04, { flare: 0.02, tipTaper: 0.2, crownFlat: 0.05 }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.4), 0.46), 0, 0.08, 0.46, 0.04, { flare: 0.02, tipTaper: 0.2, crownFlat: 0.04 }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.25), 0.38), 0, 0.08, 0.38, 0.04, { flare: 0.02, tipTaper: 0.2, crownFlat: 0.05 }),
+        bowlScale: 1.03,
         extras: [
-          { kind: "crownVolume", size: R * 0.14, lift: 0.45 },
-          { kind: "tufts", count: 3, len: R * 0.1 },
+          { kind: "crownVolume", size: R * 0.1, lift: 0.2, sheets: 5, bias: "flat" },
+          { kind: "tufts", count: 4, len: R * 0.12 },
         ],
       };
     case "short":
       return {
-        front: fringe(0.05, 0.12, 0.4),
-        right: { len: hangTo(mix(eyeY, chinY, 0.45), 0.58), wave: 0.08, vary: 0.18, cover: 0.58, coverVary: 0.08 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.55), 0.64), wave: 0.1, vary: 0.2, cover: 0.64, coverVary: 0.08 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.45), 0.58), wave: 0.08, vary: 0.18, cover: 0.58, coverVary: 0.08 },
-        justSides: sides(hangTo(mix(eyeY, chinY, 0.4), 0.5), 0.08, 2),
+        front: fringe(0.14, 0.12, 0.4, { flare: 0.05, peel: 0.04, feel: "fluffy", part: "sideL", crownPeak: 0.12, sideBulge: 0.08 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.5), 0.55), 0.14, 0.2, 0.55, 0.08, { flare: 0.07, peel: 0.05, crownPeak: 0.1, sideBulge: 0.1 }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.6), 0.62), 0.16, 0.22, 0.62, 0.08, { flare: 0.08, peel: 0.05, crownPeak: 0.08, sideBulge: 0.06 }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.5), 0.55), 0.14, 0.2, 0.55, 0.08, { flare: 0.07, peel: 0.05, crownPeak: 0.1, sideBulge: 0.1 }),
+        justSides: sides(hangTo(mix(eyeY, chinY, 0.45), 0.5), 0.12, 3, R * 0.12),
+        bowlScale: 1.06,
         extras: [
-          { kind: "crownVolume", size: R * 0.2, lift: 0.55 },
-          { kind: "tufts", count: 5, len: R * 0.14 },
+          { kind: "crownVolume", size: R * 0.16, lift: 0.48, sheets: 7, bias: "peak" },
+          { kind: "tufts", count: 5, len: R * 0.2 },
         ],
       };
     case "messy":
       return {
-        front: fringe(0.25, 0.12, 0.36),
-        right: { len: hangTo(mix(eyeY, chinY, 0.55), 0.55), wave: 0.5, vary: 0.45, cover: 0.55, coverVary: 0.28 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.7), 0.62), wave: 0.55, vary: 0.5, cover: 0.62, coverVary: 0.28 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.55), 0.55), wave: 0.5, vary: 0.45, cover: 0.55, coverVary: 0.28 },
-        justSides: sides(hangTo(mix(eyeY, chinY, 0.5), 0.5), 0.4, 2),
+        front: fringe(0.5, 0.38, 0.5, {
+          flare: 0.12, peel: 0.1, curl: 0.4, curlFreq: 4.5, waveFreq: 2.2,
+          feel: "fluffy", part: "sideR", crownPeak: 0.22, sideBulge: 0.14,
+        }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.6), 0.55), 0.65, 0.5, 0.55, 0.3, {
+          flare: 0.14, peel: 0.12, curl: 0.45, curlFreq: 5, tipTaper: 0.05, waveFreq: 2.4,
+          crownPeak: 0.18, sideBulge: 0.12,
+        }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.75), 0.62), 0.7, 0.55, 0.62, 0.3, {
+          flare: 0.16, peel: 0.12, curl: 0.5, curlFreq: 5.2, tipTaper: 0.05, waveFreq: 2.6,
+          crownPeak: 0.16, sideBulge: 0.1,
+        }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.6), 0.55), 0.65, 0.5, 0.55, 0.3, {
+          flare: 0.14, peel: 0.12, curl: 0.45, curlFreq: 5, tipTaper: 0.05, waveFreq: 2.4,
+          crownPeak: 0.18, sideBulge: 0.12,
+        }),
+        justSides: sides(hangTo(mix(eyeY, chinY, 0.55), 0.5), 0.55, 3, R * 0.15),
+        bowlScale: 1.08,
         extras: [
-          { kind: "crownVolume", size: R * 0.22, lift: 0.65 },
-          { kind: "tufts", count: 10, len: R * 0.3 },
+          { kind: "tufts", count: 10, len: R * 0.34 },
+          { kind: "crownVolume", size: R * 0.24, lift: 0.65, sheets: 9, bias: "messy" },
         ],
       };
     case "spiky":
-      // Tight bowl + a handful of big pointed locks (not many tiny needles)
       return {
-        front: fringe(0.05, 0.08, 0.28),
-        right: { len: hangTo(mix(eyeY, chinY, 0.2), 0.34), wave: 0.05, vary: 0.1, cover: 0.34, coverVary: 0.06 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.25), 0.36), wave: 0.05, vary: 0.1, cover: 0.36, coverVary: 0.06 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.2), 0.34), wave: 0.05, vary: 0.1, cover: 0.34, coverVary: 0.06 },
-        extras: { kind: "spikes", len: R * 0.95 },
+        front: fringe(0.05, 0.08, 0.28, { flare: 0.02, feel: "tidy", part: "none", crownPeak: 0.28 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.15), 0.3), 0.02, 0.08, 0.3, 0.05, { flare: 0.02, tipTaper: 0.35, crownPeak: 0.2 }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.18), 0.32), 0.02, 0.08, 0.32, 0.05, { flare: 0.02, tipTaper: 0.35, crownPeak: 0.18 }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.15), 0.3), 0.02, 0.08, 0.3, 0.05, { flare: 0.02, tipTaper: 0.35, crownPeak: 0.2 }),
+        bowlScale: 1.04,
+        extras: { kind: "spikes", len: R * 1.05 },
       };
     case "quiff":
       return {
-        front: fringe(0.08, 0.1, 0.26),
-        right: { len: hangTo(mix(eyeY, chinY, 0.45), 0.55), wave: 0.08, vary: 0.12, cover: 0.55, coverVary: 0.07 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.55), 0.6), wave: 0.08, vary: 0.12, cover: 0.6, coverVary: 0.07 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.45), 0.55), wave: 0.08, vary: 0.12, cover: 0.55, coverVary: 0.07 },
-        extras: { kind: "quiff", len: R * 0.48 },
+        front: fringe(0.08, 0.08, 0.34, { flare: 0.04, peel: 0.08, feel: "tidy", part: "sideL", crownPeak: 0.32 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.4), 0.5), 0.06, 0.1, 0.5, 0.06, { flare: 0.04, tipTaper: 0.22, crownPeak: 0.15 }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.5), 0.55), 0.06, 0.1, 0.55, 0.06, { flare: 0.04, tipTaper: 0.22, crownPeak: 0.1 }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.4), 0.5), 0.06, 0.1, 0.5, 0.06, { flare: 0.04, tipTaper: 0.22, crownPeak: 0.2, sideBulge: 0.08 }),
+        bowlScale: 1.05,
+        extras: { kind: "quiff", len: R * 0.58 },
       };
     case "pompadour":
       return {
-        front: fringe(0, 0.04, 0.22),
-        right: { len: hangTo(mix(eyeY, chinY, 0.45), 0.6), wave: 0.05, vary: 0.1, cover: 0.6, coverVary: 0.07 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.55), 0.66), wave: 0.05, vary: 0.1, cover: 0.66, coverVary: 0.07 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.45), 0.6), wave: 0.05, vary: 0.1, cover: 0.6, coverVary: 0.07 },
-        extras: { kind: "pompadour", len: R * 0.55 },
+        front: fringe(0.04, 0.05, 0.3, { flare: 0.03, feel: "tidy", part: "none", crownPeak: 0.4 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.4), 0.52), 0.04, 0.08, 0.52, 0.05, { flare: 0.03, tipTaper: 0.25, crownPeak: 0.22 }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.5), 0.58), 0.04, 0.08, 0.58, 0.05, { flare: 0.03, tipTaper: 0.25, crownPeak: 0.12 }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.4), 0.52), 0.04, 0.08, 0.52, 0.05, { flare: 0.03, tipTaper: 0.25, crownPeak: 0.22 }),
+        bowlScale: 1.05,
+        extras: { kind: "pompadour", len: R * 0.68 },
       };
     case "bob":
-      // Short bowl + crown/side volume meshes (not long face hang)
       return {
-        front: fringe(0.04, 0.06, 0.48),
-        right: { len: hangTo(chinY, 0.9), wave: 0.05, vary: 0.06, cover: 0.9, coverVary: 0.03 },
-        back: { len: hangTo(chinY, 0.92), wave: 0.05, vary: 0.06, cover: 0.92, coverVary: 0.03 },
-        left: { len: hangTo(chinY, 0.9), wave: 0.05, vary: 0.06, cover: 0.9, coverVary: 0.03 },
-        justSides: sides(hangTo(chinY, 0.88), 0.05, 3, R * 0.16),
-        extras: { kind: "bobVolume", size: R * 0.34 },
+        front: fringe(0.02, 0.03, 0.52, { flare: 0.02, tipTaper: 0.02, feel: "tidy", part: "mid", crownFlat: 0.04, sideBulge: 0.16 }),
+        right: reg(hangTo(chinY, 0.92), 0.02, 0.04, 0.92, 0.02, { flare: 0.03, peel: 0.06, tipTaper: 0.02, sideBulge: 0.18, crownFlat: 0.03 }),
+        back: reg(hangTo(chinY, 0.95), 0.02, 0.04, 0.95, 0.02, { flare: 0.03, peel: 0.07, tipTaper: 0.02, sideBulge: 0.14, crownFlat: 0.02 }),
+        left: reg(hangTo(chinY, 0.92), 0.02, 0.04, 0.92, 0.02, { flare: 0.03, peel: 0.06, tipTaper: 0.02, sideBulge: 0.18, crownFlat: 0.03 }),
+        justSides: sides(hangTo(chinY, 0.9), 0.02, 4, R * 0.18),
+        bowlScale: 1.1,
+        extras: { kind: "bobVolume", size: R * 0.42 },
       };
     case "shoulder":
       return {
-        front: fringe(0.08, 0.1, 0.5),
-        right: { len: hangTo(shoulderY, 0.96), wave: 0.12, vary: 0.12, cover: 0.96, coverVary: 0.04 },
-        back: { len: hangTo(shoulderY, 0.98), wave: 0.12, vary: 0.12, cover: 0.98, coverVary: 0.04 },
-        left: { len: hangTo(shoulderY, 0.96), wave: 0.12, vary: 0.12, cover: 0.96, coverVary: 0.04 },
-        justSides: sides(hangTo(shoulderY, 0.9), 0.12, 4, R * 0.16),
+        front: fringe(0.14, 0.1, 0.5, {
+          flare: 0.06, peel: 0.05, curl: 0.08, feel: "curtain", part: "sideL",
+          crownPeak: 0.1, sideBulge: 0.1,
+        }),
+        right: reg(hangTo(shoulderY, 0.96), 0.22, 0.14, 0.96, 0.04, {
+          flare: 0.08, peel: 0.08, curl: 0.12, curlFreq: 2.4, tipTaper: 0.1, crownPeak: 0.08, sideBulge: 0.1,
+        }),
+        back: reg(hangTo(shoulderY, 0.98), 0.2, 0.14, 0.98, 0.04, {
+          flare: 0.09, peel: 0.08, curl: 0.1, curlFreq: 2.2, crownPeak: 0.06, sideBulge: 0.08,
+        }),
+        left: reg(hangTo(shoulderY, 0.96), 0.22, 0.14, 0.96, 0.04, {
+          flare: 0.08, peel: 0.08, curl: 0.12, curlFreq: 2.4, crownPeak: 0.08, sideBulge: 0.1,
+        }),
+        justSides: sides(hangTo(shoulderY, 0.9), 0.18, 4, R * 0.17),
+        bowlScale: 1.08,
         extras: [
-          { kind: "crownVolume", size: R * 0.16, lift: 0.4 },
-          { kind: "capeVolume", len: hangTo(shoulderY, 0.85), width: R * 0.42, thick: 1.15 },
+          { kind: "bobVolume", size: R * 0.3 },
+          { kind: "capeVolume", len: hangTo(shoulderY, 0.85), width: R * 0.38, thick: 1.05 },
+          { kind: "crownVolume", size: R * 0.14, lift: 0.35, sheets: 5, bias: "peak" },
         ],
       };
     case "long":
       return {
-        front: fringe(0.08, 0.1, 0.5),
-        right: { len: hangTo(chestY, 1), wave: 0.12, vary: 0.15, cover: 1, coverVary: 0.03 },
-        back: { len: hangTo(chestY, 1), wave: 0.12, vary: 0.15, cover: 1, coverVary: 0.03 },
-        left: { len: hangTo(chestY, 1), wave: 0.12, vary: 0.15, cover: 1, coverVary: 0.03 },
-        justSides: sides(hangTo(chestY, 0.92), 0.12, 4, R * 0.17),
+        front: fringe(0.1, 0.1, 0.52, {
+          flare: 0.05, peel: 0.04, feel: "curtain", part: "mid", crownPeak: 0.08, sideBulge: 0.08,
+        }),
+        right: reg(hangTo(chestY, 1), 0.16, 0.12, 1, 0.03, {
+          flare: 0.06, peel: 0.1, tipTaper: 0.08, waveFreq: 1.2, crownPeak: 0.06, sideBulge: 0.08,
+        }),
+        back: reg(hangTo(chestY, 1), 0.14, 0.12, 1, 0.03, {
+          flare: 0.07, peel: 0.12, tipTaper: 0.08, waveFreq: 1.15, crownPeak: 0.05, sideBulge: 0.06,
+        }),
+        left: reg(hangTo(chestY, 1), 0.16, 0.12, 1, 0.03, {
+          flare: 0.06, peel: 0.1, tipTaper: 0.08, waveFreq: 1.2, crownPeak: 0.06, sideBulge: 0.08,
+        }),
+        justSides: sides(hangTo(chestY, 0.92), 0.14, 5, R * 0.16),
+        bowlScale: 1.09,
         extras: [
-          { kind: "crownVolume", size: R * 0.14, lift: 0.35 },
-          { kind: "capeVolume", len: hangTo(chestY, 0.82), width: R * 0.48, thick: 1.25 },
+          { kind: "bobVolume", size: R * 0.24 },
+          { kind: "capeVolume", len: hangTo(chestY, 0.82), width: R * 0.5, thick: 1.3 },
+          { kind: "crownVolume", size: R * 0.12, lift: 0.3, sheets: 5, bias: "peak" },
         ],
       };
     case "wavy":
       return {
-        front: fringe(0.4, 0.15, 0.48),
-        right: { len: hangTo(chestY, 1), wave: 0.75, vary: 0.22, cover: 1, coverVary: 0.04 },
-        back: { len: hangTo(chestY, 1), wave: 0.75, vary: 0.22, cover: 1, coverVary: 0.04 },
-        left: { len: hangTo(chestY, 1), wave: 0.75, vary: 0.22, cover: 1, coverVary: 0.04 },
-        justSides: sides(hangTo(chestY, 0.9), 0.65, 4, R * 0.17),
+        front: fringe(0.55, 0.22, 0.52, {
+          flare: 0.1, peel: 0.08, curl: 0.55, curlFreq: 3.6, waveFreq: 2.0,
+          feel: "fluffy", part: "sideR", crownPeak: 0.14, sideBulge: 0.12,
+        }),
+        right: reg(hangTo(chestY, 1), 0.85, 0.25, 1, 0.05, {
+          flare: 0.12, peel: 0.14, curl: 0.7, curlFreq: 4.0, tipTaper: 0.06, waveFreq: 2.1,
+          crownPeak: 0.12, sideBulge: 0.12,
+        }),
+        back: reg(hangTo(chestY, 1), 0.85, 0.25, 1, 0.05, {
+          flare: 0.13, peel: 0.14, curl: 0.72, curlFreq: 3.8, tipTaper: 0.06, waveFreq: 2.0,
+          crownPeak: 0.1, sideBulge: 0.1,
+        }),
+        left: reg(hangTo(chestY, 1), 0.85, 0.25, 1, 0.05, {
+          flare: 0.12, peel: 0.14, curl: 0.7, curlFreq: 4.0, tipTaper: 0.06, waveFreq: 2.1,
+          crownPeak: 0.12, sideBulge: 0.12,
+        }),
+        justSides: sides(hangTo(chestY, 0.9), 0.75, 5, R * 0.18),
+        bowlScale: 1.1,
         extras: [
-          { kind: "crownVolume", size: R * 0.15, lift: 0.4 },
-          { kind: "capeVolume", len: hangTo(chestY, 0.8), width: R * 0.45, wave: 0.55, thick: 1.2 },
+          { kind: "bobVolume", size: R * 0.28 },
+          { kind: "capeVolume", len: hangTo(chestY, 0.8), width: R * 0.48, wave: 0.7, thick: 1.25 },
+          { kind: "crownVolume", size: R * 0.16, lift: 0.4, sheets: 7, bias: "messy" },
         ],
       };
     case "princess":
       return {
-        front: fringe(0.12, 0.1, 0.48),
-        right: { len: hangTo(waistY, 1), wave: 0.18, vary: 0.18, cover: 1, coverVary: 0.03 },
-        back: { len: hangTo(waistY, 1), wave: 0.16, vary: 0.18, cover: 1, coverVary: 0.03 },
-        left: { len: hangTo(waistY, 1), wave: 0.18, vary: 0.18, cover: 1, coverVary: 0.03 },
-        justSides: sides(hangTo(waistY, 0.9), 0.16, 5, R * 0.18),
+        front: fringe(0.16, 0.12, 0.5, {
+          flare: 0.06, peel: 0.05, curl: 0.15, feel: "curtain", part: "mid", crownPeak: 0.1, sideBulge: 0.1,
+        }),
+        right: reg(hangTo(waistY, 1), 0.28, 0.16, 1, 0.03, {
+          flare: 0.07, peel: 0.16, curl: 0.2, curlFreq: 2.6, tipTaper: 0.05, crownPeak: 0.08, sideBulge: 0.1,
+        }),
+        back: reg(hangTo(waistY, 1), 0.24, 0.16, 1, 0.03, {
+          flare: 0.08, peel: 0.18, curl: 0.18, curlFreq: 2.4, tipTaper: 0.05, crownPeak: 0.06, sideBulge: 0.08,
+        }),
+        left: reg(hangTo(waistY, 1), 0.28, 0.16, 1, 0.03, {
+          flare: 0.07, peel: 0.16, curl: 0.2, curlFreq: 2.6, tipTaper: 0.05, crownPeak: 0.08, sideBulge: 0.1,
+        }),
+        justSides: sides(hangTo(waistY, 0.9), 0.22, 6, R * 0.19),
+        bowlScale: 1.1,
         extras: [
-          { kind: "crownVolume", size: R * 0.16, lift: 0.4 },
-          { kind: "capeVolume", len: hangTo(waistY, 0.8), width: R * 0.55, thick: 1.35 },
+          { kind: "bobVolume", size: R * 0.26 },
+          { kind: "capeVolume", len: hangTo(waistY, 0.8), width: R * 0.58, thick: 1.4 },
+          { kind: "crownVolume", size: R * 0.14, lift: 0.35, sheets: 6, bias: "peak" },
         ],
       };
     case "hime":
       return {
-        front: fringe(0, 0.03, 0.52),
-        right: { len: hangTo(chestY, 1), wave: 0.03, vary: 0.08, cover: 1, coverVary: 0.02 },
-        back: { len: hangTo(chestY, 1), wave: 0.03, vary: 0.08, cover: 1, coverVary: 0.02 },
-        left: { len: hangTo(chestY, 1), wave: 0.03, vary: 0.08, cover: 1, coverVary: 0.02 },
-        justSides: sides(hangTo(chestY, 0.9), 0.02, 4, R * 0.2),
-        extras: { kind: "himeSides", len: hangTo(chestY, 0.85) },
+        front: fringe(0.01, 0.02, 0.56, { flare: 0.01, tipTaper: 0.01, feel: "tidy", part: "none", crownFlat: 0.05 }),
+        right: reg(hangTo(chestY, 1), 0.01, 0.04, 1, 0.015, { flare: 0.02, peel: 0.04, tipTaper: 0.02, crownFlat: 0.03, sideBulge: 0.06 }),
+        back: reg(hangTo(chestY, 1), 0.01, 0.04, 1, 0.015, { flare: 0.02, peel: 0.04, tipTaper: 0.02, crownFlat: 0.02 }),
+        left: reg(hangTo(chestY, 1), 0.01, 0.04, 1, 0.015, { flare: 0.02, peel: 0.04, tipTaper: 0.02, crownFlat: 0.03, sideBulge: 0.06 }),
+        justSides: sides(hangTo(chestY, 0.92), 0.01, 5, R * 0.22),
+        bowlScale: 1.08,
+        extras: { kind: "himeSides", len: hangTo(chestY, 0.88) },
       };
     case "ponytail":
       return {
-        front: fringe(0.05, 0.08, 0.45),
-        right: { len: hangTo(mix(eyeY, chinY, 0.4), 0.6), wave: 0.05, vary: 0.1, cover: 0.6, coverVary: 0.06 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.3), 0.58), wave: 0.05, vary: 0.1, cover: 0.58, coverVary: 0.06 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.4), 0.6), wave: 0.05, vary: 0.1, cover: 0.6, coverVary: 0.06 },
-        justSides: sides(hangTo(mix(eyeY, chinY, 0.4), 0.5), 0.08, 2),
+        front: fringe(0.06, 0.08, 0.4, { flare: 0.03, feel: "tidy", part: "sideL", crownPeak: 0.08 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.35), 0.52), 0.04, 0.08, 0.52, 0.05, { flare: 0.03, tipTaper: 0.25, crownPeak: 0.06 }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.25), 0.48), 0.03, 0.08, 0.48, 0.05, { flare: 0.02, tipTaper: 0.3, crownPeak: 0.05 }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.35), 0.52), 0.04, 0.08, 0.52, 0.05, { flare: 0.03, tipTaper: 0.25, crownPeak: 0.06 }),
+        justSides: sides(hangTo(mix(eyeY, chinY, 0.35), 0.48), 0.05, 2, R * 0.1),
+        bowlScale: 1.04,
         extras: [
-          { kind: "crownVolume", size: R * 0.12, lift: 0.35 },
-          { kind: "pony", len: hangTo(chestY, 0.9) },
+          { kind: "crownVolume", size: R * 0.14, lift: 0.35, sheets: 6, bias: "peak" },
+          { kind: "pony", len: hangTo(chestY, 0.92), thick: 1.35 },
         ],
       };
     case "side-tail":
       return {
-        front: fringe(0.06, 0.08, 0.44),
-        right: { len: hangTo(mix(eyeY, chinY, 0.3), 0.58), wave: 0.08, vary: 0.1, cover: 0.58, coverVary: 0.06 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.35), 0.6), wave: 0.05, vary: 0.1, cover: 0.6, coverVary: 0.06 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.45), 0.6), wave: 0.08, vary: 0.1, cover: 0.6, coverVary: 0.06 },
-        justSides: sides(hangTo(mix(eyeY, chinY, 0.4), 0.5), 0.1, 2),
-        extras: { kind: "sidePony", side: 1, len: hangTo(chestY, 0.88) },
+        front: fringe(0.1, 0.1, 0.42, { flare: 0.04, feel: "curtain", part: "sideR", crownPeak: 0.1, sideBulge: 0.08 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.25), 0.5), 0.05, 0.08, 0.5, 0.05, { flare: 0.03, tipTaper: 0.28, crownPeak: 0.06 }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.3), 0.55), 0.05, 0.08, 0.55, 0.05, { flare: 0.03, tipTaper: 0.25, crownPeak: 0.05 }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.45), 0.58), 0.12, 0.12, 0.58, 0.06, { flare: 0.06, peel: 0.05, curl: 0.1, sideBulge: 0.1 }),
+        justSides: sides(hangTo(mix(eyeY, chinY, 0.4), 0.5), 0.12, 2, R * 0.12),
+        bowlScale: 1.05,
+        extras: { kind: "sidePony", side: 1, len: hangTo(chestY, 0.9), thick: 1.25 },
       };
     case "half-up":
       return {
-        front: fringe(0.08, 0.1, 0.48),
-        right: { len: hangTo(shoulderY, 0.9), wave: 0.12, vary: 0.15, cover: 0.9, coverVary: 0.05 },
-        back: { len: hangTo(shoulderY, 0.9), wave: 0.12, vary: 0.15, cover: 0.9, coverVary: 0.05 },
-        left: { len: hangTo(shoulderY, 0.9), wave: 0.12, vary: 0.15, cover: 0.9, coverVary: 0.05 },
-        justSides: sides(hangTo(shoulderY, 0.85), 0.12, 3),
+        front: fringe(0.12, 0.1, 0.46, { flare: 0.05, peel: 0.04, feel: "fluffy", part: "mid", crownPeak: 0.16 }),
+        right: reg(hangTo(shoulderY, 0.9), 0.18, 0.14, 0.9, 0.05, { flare: 0.07, peel: 0.08, curl: 0.1, crownPeak: 0.1, sideBulge: 0.08 }),
+        back: reg(hangTo(shoulderY, 0.9), 0.16, 0.14, 0.9, 0.05, { flare: 0.07, peel: 0.08, curl: 0.08, crownPeak: 0.08 }),
+        left: reg(hangTo(shoulderY, 0.9), 0.18, 0.14, 0.9, 0.05, { flare: 0.07, peel: 0.08, curl: 0.1, crownPeak: 0.1, sideBulge: 0.08 }),
+        justSides: sides(hangTo(shoulderY, 0.85), 0.16, 3, R * 0.14),
+        bowlScale: 1.06,
         extras: [
-          { kind: "crownVolume", size: R * 0.14, lift: 0.4 },
-          { kind: "pony", len: hangTo(mix(shoulderY, chestY, 0.5), 0.85) },
+          { kind: "crownVolume", size: R * 0.18, lift: 0.5, sheets: 7, bias: "peak" },
+          { kind: "pony", len: hangTo(mix(shoulderY, chestY, 0.55), 0.88), thick: 1.15 },
         ],
       };
     case "bun":
       return {
-        front: fringe(0.04, 0.08, 0.42),
-        right: { len: hangTo(mix(eyeY, chinY, 0.3), 0.55), wave: 0, vary: 0.08, cover: 0.55, coverVary: 0.05 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.3), 0.55), wave: 0, vary: 0.08, cover: 0.55, coverVary: 0.05 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.3), 0.55), wave: 0, vary: 0.08, cover: 0.55, coverVary: 0.05 },
-        justSides: sides(hangTo(mix(eyeY, chinY, 0.35), 0.5), 0.05, 2),
-        extras: { kind: "bun", size: R * 0.38 },
+        front: fringe(0.03, 0.04, 0.34, { flare: 0.02, feel: "tidy", part: "none", crownPeak: 0.06 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.22), 0.48), 0, 0.06, 0.48, 0.04, { flare: 0.02, tipTaper: 0.3 }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.22), 0.48), 0, 0.06, 0.48, 0.04, { flare: 0.02, tipTaper: 0.3 }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.22), 0.48), 0, 0.06, 0.48, 0.04, { flare: 0.02, tipTaper: 0.3 }),
+        justSides: sides(hangTo(mix(eyeY, chinY, 0.28), 0.45), 0.03, 2, R * 0.09),
+        bowlScale: 1.04,
+        extras: { kind: "bun", size: R * 0.44 },
       };
     case "odango":
       return {
-        front: fringe(0.04, 0.06, 0.48),
-        right: { len: hangTo(mix(eyeY, chinY, 0.2), 0.48), wave: 0, vary: 0.06, cover: 0.48, coverVary: 0.04 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.35), 0.58), wave: 0.05, vary: 0.08, cover: 0.58, coverVary: 0.04 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.2), 0.48), wave: 0, vary: 0.06, cover: 0.48, coverVary: 0.04 },
-        justSides: sides(hangTo(mix(eyeY, chinY, 0.4), 0.5), 0.06, 2),
-        extras: { kind: "odango", size: R * 0.28 },
+        front: fringe(0.04, 0.05, 0.36, { flare: 0.02, feel: "tidy", part: "mid", crownPeak: 0.08 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.15), 0.42), 0, 0.05, 0.42, 0.03, { flare: 0.02, tipTaper: 0.32 }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.28), 0.52), 0.04, 0.06, 0.52, 0.04, { flare: 0.03, tipTaper: 0.25 }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.15), 0.42), 0, 0.05, 0.42, 0.03, { flare: 0.02, tipTaper: 0.32 }),
+        justSides: sides(hangTo(mix(eyeY, chinY, 0.35), 0.48), 0.04, 2, R * 0.1),
+        bowlScale: 1.04,
+        extras: { kind: "odango", size: R * 0.32 },
       };
     case "twin-tails":
       return {
-        front: fringe(0.06, 0.08, 0.48),
-        right: { len: hangTo(mix(eyeY, chinY, 0.4), 0.6), wave: 0.08, vary: 0.1, cover: 0.6, coverVary: 0.06 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.4), 0.6), wave: 0.08, vary: 0.1, cover: 0.6, coverVary: 0.06 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.4), 0.6), wave: 0.08, vary: 0.1, cover: 0.6, coverVary: 0.06 },
-        justSides: sides(hangTo(mix(eyeY, chinY, 0.45), 0.5), 0.1, 3),
-        extras: { kind: "twins", len: hangTo(chestY, 0.88) },
+        front: fringe(0.12, 0.1, 0.44, { flare: 0.05, curl: 0.08, feel: "fluffy", part: "mid", crownPeak: 0.12 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.35), 0.55), 0.1, 0.1, 0.55, 0.05, { flare: 0.04, tipTaper: 0.22, crownPeak: 0.08 }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.35), 0.55), 0.08, 0.1, 0.55, 0.05, { flare: 0.04, tipTaper: 0.22, crownPeak: 0.06 }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.35), 0.55), 0.1, 0.1, 0.55, 0.05, { flare: 0.04, tipTaper: 0.22, crownPeak: 0.08 }),
+        justSides: sides(hangTo(mix(eyeY, chinY, 0.4), 0.5), 0.12, 2, R * 0.1),
+        bowlScale: 1.05,
+        extras: { kind: "twins", len: hangTo(chestY, 0.9), curl: 0.55, thick: 1.2 },
       };
     case "pigtails":
       return {
-        front: fringe(0.06, 0.08, 0.48),
-        right: { len: hangTo(mix(eyeY, chinY, 0.4), 0.6), wave: 0.08, vary: 0.1, cover: 0.6, coverVary: 0.06 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.4), 0.6), wave: 0.08, vary: 0.1, cover: 0.6, coverVary: 0.06 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.4), 0.6), wave: 0.08, vary: 0.1, cover: 0.6, coverVary: 0.06 },
-        justSides: sides(hangTo(mix(eyeY, chinY, 0.4), 0.5), 0.1, 3),
-        extras: { kind: "pigs", len: hangTo(shoulderY, 0.85) },
+        front: fringe(0.08, 0.08, 0.4, { flare: 0.04, feel: "tidy", part: "sideL", crownPeak: 0.1 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.35), 0.55), 0.08, 0.1, 0.55, 0.05, { flare: 0.04, tipTaper: 0.22, crownPeak: 0.06 }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.35), 0.55), 0.08, 0.1, 0.55, 0.05, { flare: 0.04, tipTaper: 0.22, crownPeak: 0.05 }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.35), 0.55), 0.08, 0.1, 0.55, 0.05, { flare: 0.04, tipTaper: 0.22, crownPeak: 0.06 }),
+        justSides: sides(hangTo(mix(eyeY, chinY, 0.35), 0.5), 0.1, 2, R * 0.1),
+        bowlScale: 1.05,
+        extras: { kind: "pigs", len: hangTo(shoulderY, 0.88), thick: 1.15 },
       };
     case "braid":
       return {
-        front: fringe(0.05, 0.08, 0.45),
-        right: { len: hangTo(mix(eyeY, chinY, 0.35), 0.58), wave: 0.05, vary: 0.08, cover: 0.58, coverVary: 0.06 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.35), 0.58), wave: 0.05, vary: 0.08, cover: 0.58, coverVary: 0.06 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.35), 0.58), wave: 0.05, vary: 0.08, cover: 0.58, coverVary: 0.06 },
-        justSides: sides(hangTo(mix(eyeY, chinY, 0.35), 0.5), 0.08, 2),
-        extras: { kind: "braid", len: hangTo(chestY, 0.9) },
+        front: fringe(0.05, 0.05, 0.4, { flare: 0.03, feel: "tidy", part: "sideR", crownPeak: 0.06 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.28), 0.5), 0.03, 0.06, 0.5, 0.04, { flare: 0.02, tipTaper: 0.28 }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.28), 0.5), 0.03, 0.06, 0.5, 0.04, { flare: 0.02, tipTaper: 0.28 }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.28), 0.5), 0.03, 0.06, 0.5, 0.04, { flare: 0.02, tipTaper: 0.28 }),
+        justSides: sides(hangTo(mix(eyeY, chinY, 0.3), 0.48), 0.04, 2, R * 0.09),
+        bowlScale: 1.04,
+        extras: { kind: "braid", len: hangTo(chestY, 0.92) },
       };
     case "drills":
       return {
-        front: fringe(0.2, 0.12, 0.48),
-        right: { len: hangTo(shoulderY, 0.9), wave: 0.85, vary: 0.22, cover: 0.9, coverVary: 0.06 },
-        back: { len: hangTo(mix(chinY, shoulderY, 0.35), 0.84), wave: 0.35, vary: 0.18, cover: 0.84, coverVary: 0.08 },
-        left: { len: hangTo(shoulderY, 0.9), wave: 0.85, vary: 0.22, cover: 0.9, coverVary: 0.06 },
-        justSides: sides(hangTo(shoulderY, 0.85), 0.7, 3, R * 0.16),
-        extras: { kind: "capeVolume", len: hangTo(shoulderY, 0.8), width: R * 0.28, wave: 0.7, thick: 0.9 },
+        front: fringe(0.5, 0.22, 0.5, {
+          flare: 0.1, peel: 0.1, curl: 0.85, curlFreq: 5.5, waveFreq: 2.4,
+          feel: "fluffy", part: "mid", crownPeak: 0.16, sideBulge: 0.12,
+        }),
+        right: reg(hangTo(shoulderY, 0.92), 0.95, 0.22, 0.92, 0.06, {
+          flare: 0.14, peel: 0.16, curl: 1.05, curlFreq: 6.2, tipTaper: 0.04, waveFreq: 2.5,
+          crownPeak: 0.12, sideBulge: 0.12,
+        }),
+        back: reg(hangTo(mix(chinY, shoulderY, 0.4), 0.84), 0.45, 0.18, 0.84, 0.08, {
+          flare: 0.1, peel: 0.1, curl: 0.55, curlFreq: 4.0, crownPeak: 0.1,
+        }),
+        left: reg(hangTo(shoulderY, 0.92), 0.95, 0.22, 0.92, 0.06, {
+          flare: 0.14, peel: 0.16, curl: 1.05, curlFreq: 6.2, tipTaper: 0.04, waveFreq: 2.5,
+          crownPeak: 0.12, sideBulge: 0.12,
+        }),
+        justSides: sides(hangTo(shoulderY, 0.88), 0.85, 4, R * 0.17),
+        bowlScale: 1.1,
+        extras: [
+          { kind: "drills", len: hangTo(shoulderY, 0.9), coils: 5 },
+          { kind: "capeVolume", len: hangTo(shoulderY, 0.75), width: R * 0.26, wave: 0.8, thick: 0.85 },
+          { kind: "crownVolume", size: R * 0.16, lift: 0.4, sheets: 6, bias: "messy" },
+        ],
       };
     case "afro":
       return {
-        front: fringe(0.1, 0.1, 0.3),
-        right: { len: hangTo(mix(eyeY, chinY, 0.12), 0.34), wave: 0.15, vary: 0.1, cover: 0.34, coverVary: 0.06 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.12), 0.34), wave: 0.15, vary: 0.1, cover: 0.34, coverVary: 0.06 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.12), 0.34), wave: 0.15, vary: 0.1, cover: 0.34, coverVary: 0.06 },
-        bowlScale: 1.05,
-        extras: { kind: "afro", size: R * 0.72 },
+        front: fringe(0.2, 0.12, 0.28, { flare: 0.08, curl: 0.4, curlFreq: 6, feel: "fluffy", part: "none", crownPeak: 0.35, sideBulge: 0.25 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.08), 0.28), 0.25, 0.12, 0.28, 0.05, {
+          flare: 0.1, curl: 0.55, curlFreq: 6.5, tipTaper: 0.15, crownPeak: 0.3, sideBulge: 0.28,
+        }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.08), 0.28), 0.25, 0.12, 0.28, 0.05, {
+          flare: 0.1, curl: 0.55, curlFreq: 6.5, tipTaper: 0.15, crownPeak: 0.3, sideBulge: 0.28,
+        }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.08), 0.28), 0.25, 0.12, 0.28, 0.05, {
+          flare: 0.1, curl: 0.55, curlFreq: 6.5, tipTaper: 0.15, crownPeak: 0.3, sideBulge: 0.28,
+        }),
+        bowlScale: 1.14,
+        extras: { kind: "afro", size: R * 0.85 },
       };
     default:
       return {
-        front: fringe(0.08, 0.1, 0.48),
-        right: { len: hangTo(mix(eyeY, chinY, 0.5), 0.65), wave: 0.1, vary: 0.12, cover: 0.65, coverVary: 0.08 },
-        back: { len: hangTo(mix(eyeY, chinY, 0.55), 0.68), wave: 0.1, vary: 0.12, cover: 0.68, coverVary: 0.08 },
-        left: { len: hangTo(mix(eyeY, chinY, 0.5), 0.65), wave: 0.1, vary: 0.12, cover: 0.65, coverVary: 0.08 },
-        justSides: sides(hangTo(mix(eyeY, chinY, 0.4), 0.5), 0.1, 2),
-        extras: { kind: "crownVolume", size: R * 0.16, lift: 0.45 },
+        front: fringe(0.12, 0.12, 0.48, { flare: 0.06, peel: 0.05, feel: "curtain", part: "sideL", crownPeak: 0.1, sideBulge: 0.08 }),
+        right: reg(hangTo(mix(eyeY, chinY, 0.55), 0.65), 0.16, 0.14, 0.65, 0.08, { flare: 0.07, peel: 0.06, crownPeak: 0.08, sideBulge: 0.08 }),
+        back: reg(hangTo(mix(eyeY, chinY, 0.6), 0.68), 0.16, 0.14, 0.68, 0.08, { flare: 0.08, peel: 0.06, crownPeak: 0.06 }),
+        left: reg(hangTo(mix(eyeY, chinY, 0.55), 0.65), 0.16, 0.14, 0.65, 0.08, { flare: 0.07, peel: 0.06, crownPeak: 0.08, sideBulge: 0.08 }),
+        justSides: sides(hangTo(mix(eyeY, chinY, 0.45), 0.55), 0.14, 3, R * 0.13),
+        bowlScale: 1.07,
+        extras: { kind: "crownVolume", size: R * 0.2, lift: 0.55, sheets: 7, bias: "peak" },
       };
   }
 }
@@ -371,22 +492,52 @@ function sliceHangLength(cfg, localIndex, globalIndex) {
 }
 
 /**
- * One slice: crown → truncated rim (by cover) → optional hang.
- * Shorter than bowl = stop θ early (drop lower sphere rows).
+ * Fringe part falloff — shortens hang / trims cover near the part line.
+ * part: "mid" | "sideL" | "sideR" | "none"
+ * Returns { hangMul, coverMul } in 0…1.
  */
-function makeExtendedSlice(mat, phi0, phiLen, radius, headY, cover, hangLen, wave, sliceIndex, name, skullL = null) {
+function fringePartFalloff(part, localIndex, count) {
+  if (!part || part === "none" || count <= 1) return { hangMul: 1, coverMul: 1 };
+  const mid = (count - 1) * 0.5;
+  const partI =
+    part === "mid" ? mid : part === "sideL" ? count * 0.22 : count * 0.78;
+  const dist = Math.abs(localIndex - partI) / Math.max(0.5, mid);
+  // Soft valley at the part; curtain styles keep more length at edges
+  const valley = clamp01(1 - dist * 1.35);
+  const hangMul = mix(1, 0.18, valley * valley);
+  const coverMul = mix(1, 0.55, valley);
+  return { hangMul, coverMul };
+}
+
+/**
+ * One slice: crown → truncated rim (by cover) → optional hang.
+ * Hang shape knobs (from region cfg): flare, peel, curl, curlFreq, tipTaper, waveFreq.
+ */
+function makeExtendedSlice(mat, phi0, phiLen, radius, headY, cover, hangLen, wave, sliceIndex, name, skullL = null, shape = {}) {
   const phiSegs = 2;
   const cols = phiSegs + 1;
   const thetaMax = mix(THETA_FULL * 0.1, THETA_FULL, cover);
   const bowlSegs = Math.max(2, Math.ceil(THETA_SEGS_FULL * cover));
   const bowlRows = bowlSegs + 1;
-  const hangRows = hangLen > 1e-4 ? Math.max(2, 2 + Math.ceil(4 + wave * 5)) : 0;
+  const curl = Math.max(0, shape.curl ?? 0);
+  const hangRows =
+    hangLen > 1e-4
+      ? Math.max(2, 2 + Math.ceil(4 + wave * 5 + curl * 4))
+      : 0;
   const totalRows = bowlRows + hangRows;
 
   const rimY = radius * Math.cos(thetaMax);
   const rimR = radius * Math.sin(thetaMax);
   const phiMid = phi0 + phiLen * 0.5;
   const safeL = skullL || { headY, R: radius / 1.1 };
+  const flareScale = shape.flare ?? 0.045;
+  const peel = shape.peel ?? 0;
+  const curlFreq = shape.curlFreq ?? 3.2;
+  const tipTaper = shape.tipTaper ?? 0.12;
+  const waveFreq = shape.waveFreq ?? 1.4;
+  const crownPeak = shape.crownPeak ?? 0;
+  const crownFlat = shape.crownFlat ?? 0;
+  const sideBulge = shape.sideBulge ?? 0;
 
   const pos = [];
   const uvs = [];
@@ -406,9 +557,14 @@ function makeExtendedSlice(mat, phi0, phiLen, radius, headY, cover, hangLen, wav
         const theta = tv * thetaMax;
         const st = Math.sin(theta);
         const ct = Math.cos(theta);
-        x = -Math.cos(phi) * st * radius;
-        y = ct * radius;
-        z = Math.sin(phi) * st * radius;
+        // Non-spherical crown: peak lifts apex, flat squashes top, sideBulge fattens mid latitudes
+        const peakLift = crownPeak * Math.pow(Math.max(0, ct), 2.4) * (1 - st * 0.35);
+        const flatPush = crownFlat * Math.pow(Math.max(0, ct), 3.2);
+        const bulge = sideBulge * Math.sin(theta) * Math.sin(theta) * (0.55 + 0.45 * Math.abs(Math.sin(phi)));
+        const rXY = radius * (1 + bulge);
+        x = -Math.cos(phi) * st * rXY;
+        y = ct * radius * (1 + peakLift - flatPush);
+        z = Math.sin(phi) * st * rXY;
         v = tv * 0.55;
       } else {
         const h = (iy - bowlRows + 1) / hangRows;
@@ -416,19 +572,26 @@ function makeExtendedSlice(mat, phi0, phiLen, radius, headY, cover, hangLen, wav
         const oz = Math.sin(phi);
         const tx = -Math.sin(phiMid);
         const tz = -Math.cos(phiMid);
-        const flare = h * radius * 0.045;
+        // Peel out from rim, then flare as length falls
+        const peelOut = peel * Math.sin(Math.min(1, h * 1.6) * Math.PI * 0.5) * radius;
+        const flare = h * radius * flareScale + peelOut;
         const sway =
-          Math.sin(h * Math.PI * (1.4 + wave * 3) + sliceIndex * 0.7) * wave * radius * 0.2;
-        const sway2 = Math.sin(h * Math.PI * 2 + u * Math.PI) * wave * radius * 0.04;
-        x = ox * rimR + ox * flare + tx * (sway + sway2);
-        z = oz * rimR + oz * flare + tz * (sway + sway2);
+          Math.sin(h * Math.PI * (waveFreq + wave * 3) + sliceIndex * 0.7) * wave * radius * 0.22;
+        const sway2 = Math.sin(h * Math.PI * 2.2 + u * Math.PI) * wave * radius * 0.05;
+        // Curl / coil around the hang axis (reads as wavy·drills·curly texture)
+        const ang = h * Math.PI * curlFreq + sliceIndex * 0.35 + u;
+        const cr = curl * radius * Math.sin(h * Math.PI) * (0.55 + 0.45 * h);
+        const curlX = tx * Math.cos(ang) * cr + ox * Math.sin(ang) * cr * 0.35;
+        const curlZ = tz * Math.cos(ang) * cr + oz * Math.sin(ang) * cr * 0.35;
+        x = ox * rimR + ox * flare + tx * (sway + sway2) + curlX;
+        z = oz * rimR + oz * flare + tz * (sway + sway2) + curlZ;
         y = rimY - h * hangLen;
-        if (h > 0.7) {
-          const taper = mix(1, 0.88, (h - 0.7) / 0.3);
+        if (h > 0.65 && tipTaper > 0) {
+          const taper = mix(1, 1 - tipTaper, (h - 0.65) / 0.35);
           const midX = -Math.cos(phiMid) * (rimR + flare);
           const midZ = Math.sin(phiMid) * (rimR + flare);
-          x = mix(x, midX + tx * (sway + sway2), 1 - taper);
-          z = mix(z, midZ + tz * (sway + sway2), 1 - taper);
+          x = mix(x, midX + tx * (sway + sway2) + curlX, 1 - taper);
+          z = mix(z, midZ + tz * (sway + sway2) + curlZ, 1 - taper);
         }
         v = 0.55 + h * 0.45;
       }
@@ -533,28 +696,39 @@ function addExtraKind(g, mat, extras, L, radius) {
 
   if (kind === "pony" || kind === "braid") {
     const top = onPhi(Math.PI, 0.85, R * 0.02);
-    const pts = [top];
-    const n = kind === "braid" ? 7 : 5;
-    for (let i = 1; i < n; i++) {
-      const t = i / (n - 1);
-      const wave = kind === "braid" ? Math.sin(t * 10) * R * 0.04 : Math.sin(t * 3) * R * 0.03;
-      pts.push(new THREE.Vector3(wave, top.y - len * t, top.z - R * 0.08 * t));
-    }
+    const thick = extras.thick ?? 1;
     if (kind === "braid") {
-      ribbon(mat, pts, R * 0.1, R * 0.06, "braid", g);
-      ribbon(
-        mat,
-        pts.map((p, i) => p.clone().add(new THREE.Vector3(Math.sin(i) * R * 0.03, 0, 0))),
-        R * 0.08,
-        R * 0.05,
-        "braid",
-        g
-      );
+      // Triple helix: 12 points, 3 phase-offset strands
+      const n = 12;
+      const helixR = R * 0.055;
+      for (let s = 0; s < 3; s++) {
+        const phase = (s / 3) * Math.PI * 2;
+        const pts = [];
+        for (let i = 0; i < n; i++) {
+          const t = i / (n - 1);
+          const a = t * Math.PI * 6 + phase;
+          pts.push(
+            new THREE.Vector3(
+              Math.cos(a) * helixR,
+              top.y - len * t,
+              top.z - R * 0.08 * t + Math.sin(a) * helixR
+            )
+          );
+        }
+        ribbon(mat, pts, R * 0.085, R * 0.045, "braid", g);
+      }
     } else {
-      ribbon(mat, pts, R * 0.14, R * 0.08, "pony", g);
+      const pts = [top];
+      for (let i = 1; i < 5; i++) {
+        const t = i / 4;
+        const wave = Math.sin(t * 3) * R * 0.03;
+        pts.push(new THREE.Vector3(wave, top.y - len * t, top.z - R * 0.08 * t));
+      }
+      ribbon(mat, pts, R * 0.14 * thick, R * 0.08 * thick, "pony", g);
     }
   } else if (kind === "sidePony") {
     const side = extras.side >= 0 ? 1 : -1;
+    const thick = extras.thick ?? 1;
     const phi = Math.PI / 2 + side * (Math.PI / 2 + 0.35);
     const top = onPhi(phi, 0.75, R * 0.02);
     const pts = [top];
@@ -562,17 +736,62 @@ function addExtraKind(g, mat, extras, L, radius) {
       const t = i / 4;
       pts.push(new THREE.Vector3(top.x + side * R * 0.05 * t, top.y - len * t, top.z - R * 0.06 * t));
     }
-    ribbon(mat, pts, R * 0.12, R * 0.07, "sidePony", g);
+    ribbon(mat, pts, R * 0.12 * thick, R * 0.07 * thick, "sidePony", g);
   } else if (kind === "twins" || kind === "pigs") {
+    const curl = extras.curl ?? 0;
+    const thick = extras.thick ?? 1;
     for (const side of [-1, 1]) {
       const phi = Math.PI / 2 + side * (Math.PI / 2 + 0.2);
       const top = onPhi(phi, 0.72, R * 0.02);
       const pts = [top];
-      for (let i = 1; i < 5; i++) {
-        const t = i / 4;
-        pts.push(new THREE.Vector3(top.x * (1 + 0.05 * t), top.y - len * t, top.z - R * 0.05 * t));
+      const n = curl > 0 ? 10 : 5;
+      for (let i = 1; i < n; i++) {
+        const t = i / (n - 1);
+        const spiral = curl * R * 0.12;
+        const a = t * Math.PI * 4 * curl * side;
+        pts.push(
+          new THREE.Vector3(
+            top.x * (1 + 0.05 * t) + Math.cos(a) * spiral * t,
+            top.y - len * t,
+            top.z - R * 0.05 * t + Math.sin(a) * spiral * t
+          )
+        );
       }
-      ribbon(mat, pts, R * 0.1, R * 0.06, kind, g);
+      ribbon(mat, pts, R * 0.1 * thick, R * 0.06 * thick, kind, g);
+    }
+  } else if (kind === "drills") {
+    // Spiral coil ribbons on each side
+    const coils = extras.coils ?? 5;
+    for (const side of [-1, 1]) {
+      const phi = Math.PI / 2 + side * (Math.PI / 2 + 0.15);
+      const top = onPhi(phi, 0.7, R * 0.02);
+      const n = Math.max(10, coils * 4);
+      const helixR = R * 0.1;
+      const pts = [];
+      for (let i = 0; i < n; i++) {
+        const t = i / (n - 1);
+        const a = t * Math.PI * 2 * coils * side;
+        const taper = 1 - t * 0.55;
+        pts.push(
+          new THREE.Vector3(
+            top.x + side * R * 0.04 * t + Math.cos(a) * helixR * taper,
+            top.y - len * t,
+            top.z - R * 0.04 * t + Math.sin(a) * helixR * taper
+          )
+        );
+      }
+      ribbon(mat, pts, R * 0.12, R * 0.04, "drills", g);
+      ribbon(
+        mat,
+        pts.map((p, i) => {
+          const t = i / (n - 1);
+          return p.clone().add(new THREE.Vector3(side * R * 0.02 * (1 - t), 0, R * 0.015));
+        }),
+        R * 0.09,
+        R * 0.03,
+        "drills",
+        g
+      );
     }
   } else if (kind === "bun" || kind === "odango") {
     const size = extras.size ?? R * 0.25;
@@ -748,15 +967,33 @@ function addExtraKind(g, mat, extras, L, radius) {
     const size = extras.size ?? R * 0.18;
     const lift = extras.lift ?? 0.5;
     const sheets = extras.sheets ?? 6;
+    const bias = extras.bias || "peak"; // peak | flat | messy
     for (let k = 0; k < sheets; k++) {
       const t = k / sheets;
       const phi = Math.PI * 2 * t + 0.15;
-      const root = onPhi(phi, 0.55 + lift * 0.2, R * 0.01);
-      const crest = onPhi(phi, 0.92, size * (0.7 + lift * 0.4));
-      crest.y += size * (0.15 + lift * 0.25);
-      const tip = onPhi(phi + 0.08, 0.75, size * 0.15);
-      tip.y += size * 0.05;
-      ribbon(mat, [root, crest, tip], size * 0.7, size * 0.25, "crownVolume", g);
+      // Bias steers volume away from a uniform dome
+      const elevRoot =
+        bias === "flat" ? 0.7 : bias === "messy" ? 0.48 + hash01(k, 9) * 0.28 : 0.52 + lift * 0.18;
+      const elevCrest =
+        bias === "flat" ? 0.82 : bias === "messy" ? 0.78 + hash01(k, 11) * 0.2 : 0.9 + lift * 0.08;
+      const yBoost =
+        bias === "flat"
+          ? size * 0.04
+          : bias === "messy"
+            ? size * (0.1 + hash01(k, 13) * 0.35)
+            : size * (0.18 + lift * 0.3);
+      const outward =
+        bias === "flat" ? size * 0.35 : bias === "messy" ? size * (0.55 + hash01(k, 15) * 0.45) : size * (0.7 + lift * 0.4);
+      const root = onPhi(phi, elevRoot, R * 0.01);
+      const crest = onPhi(phi + (bias === "messy" ? (hash01(k, 17) - 0.5) * 0.35 : 0.05), elevCrest, outward);
+      crest.y += yBoost;
+      if (bias === "messy") {
+        crest.x += (hash01(k, 19) - 0.5) * size * 0.35;
+        crest.z += (hash01(k, 21) - 0.5) * size * 0.25;
+      }
+      const tip = onPhi(phi + 0.1, bias === "flat" ? 0.7 : 0.72, size * (bias === "flat" ? 0.08 : 0.18));
+      tip.y += size * (bias === "flat" ? 0.02 : 0.06);
+      ribbon(mat, [root, crest, tip], size * (bias === "messy" ? 0.55 : 0.7), size * 0.25, "crownVolume", g);
     }
   } else if (kind === "capeVolume") {
     // Back/side volume sheets — not more bowl slices
@@ -901,11 +1138,23 @@ export function buildSmoothHair(mat, opts = {}) {
       const sg = new THREE.Group();
       sg.name = `hair-${grp.name}`;
       const wave = grp.cfg?.wave ?? 0;
+      const isFront = grp.name === "front";
       for (let i = 0; i < perRegion; i++) {
         const phi0 = grp.start + i * SLICE - SEAL * 0.5;
         const phiLen = SLICE + SEAL;
-        const cover = sliceCover(grp.cfg, i, globalI);
-        const hang = sliceHangLength(grp.cfg, i, globalI);
+        let cover = sliceCover(grp.cfg, i, globalI);
+        let hang = sliceHangLength(grp.cfg, i, globalI);
+        if (isFront) {
+          const fall = fringePartFalloff(grp.cfg?.part, i, perRegion);
+          cover = clamp01(cover * fall.coverMul);
+          hang *= fall.hangMul;
+          // Fluffy fringe: push wave/curl per-slice jitter via hang already; bump wave
+          if (grp.cfg?.feel === "fluffy") {
+            hang *= 0.85 + hash01(globalI, 23) * 0.4;
+          } else if (grp.cfg?.feel === "tidy") {
+            hang *= 0.96 + hash01(globalI, 23) * 0.08;
+          }
+        }
         sg.add(
           makeExtendedSlice(
             cardMat,
@@ -915,10 +1164,11 @@ export function buildSmoothHair(mat, opts = {}) {
             L.headY,
             cover,
             hang,
-            wave,
+            isFront && grp.cfg?.feel === "fluffy" ? wave * (1.15 + hash01(globalI, 25) * 0.5) : wave,
             globalI,
             `slice-${grp.name}-${i}`,
-            L
+            L,
+            grp.cfg
           )
         );
         globalI++;
