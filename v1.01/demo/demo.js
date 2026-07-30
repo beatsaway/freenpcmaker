@@ -237,6 +237,13 @@ function parseHex(css) {
   return parseInt(css.replace("#", ""), 16);
 }
 
+function fitGenesField() {
+  if (!lookCodeEl) return;
+  // Fallback when field-sizing: content isn't supported
+  lookCodeEl.style.height = "auto";
+  lookCodeEl.style.height = `${lookCodeEl.scrollHeight}px`;
+}
+
 function dumpLookCode() {
   if (!lookCodeEl) return;
   // Don't clobber while the user is editing
@@ -246,6 +253,7 @@ function dumpLookCode() {
     pack: [...exportSelected],
     speed: animSpeed,
   });
+  fitGenesField();
 }
 
 function isRandOn(key) {
@@ -936,6 +944,7 @@ btnLookCopy?.addEventListener("click", async () => {
     speed: animSpeed,
   });
   lookCodeEl.value = text;
+  fitGenesField();
   try {
     await navigator.clipboard.writeText(text);
     setStatus("Genes copied");
@@ -969,7 +978,10 @@ function applyGenesText(text) {
 btnLookApply?.addEventListener("click", async () => {
   try {
     const text = await navigator.clipboard.readText();
-    if (lookCodeEl) lookCodeEl.value = text;
+    if (lookCodeEl) {
+      lookCodeEl.value = text;
+      fitGenesField();
+    }
     applyGenesText(text);
   } catch {
     setStatus("Genes: allow clipboard access, or copy a code first");
@@ -980,6 +992,7 @@ window.addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  fitGenesField();
 });
 
 function tick() {

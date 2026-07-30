@@ -453,9 +453,12 @@ button.rand-star:hover { border-color: var(--line); filter: none; background: #f
 
 #look-code {
   width: 100%;
-  resize: vertical;
-  min-height: 36px;
-  max-height: 12vh;
+  resize: none;
+  overflow: hidden;
+  height: auto;
+  field-sizing: content;
+  min-height: 0;
+  max-height: none;
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
   font-size: 9px;
   line-height: 1.25;
