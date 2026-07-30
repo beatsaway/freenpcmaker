@@ -65,13 +65,11 @@ export function humanLayout(cfg = {}) {
   const legX = Math.max(0.08, 0.1 * w) + (legThick - 1) * 0.012;
   const shoulderX = 0.18 * w * Math.sqrt(chestWidth);
 
-  // Shared join radius: torso top hole ↔ neck bottom (same circle before Z squash)
+  // Neck column — short; head sits back so under-chin rests on it (merged into torso mesh)
   const neckR = 0.034 * mix(0.92, 1.06, (w - 0.92) / 0.16);
-  const rNeckJoin = neckR * 1.02;
-
-  // Neck length — long enough that after deep skull sink the column still reaches the occiput
+  const rNeckJoin = neckR; // same radius as shaft — continuous with torso top
   const estHeadH = Math.max(0.2, yNeck / 6.5);
-  const neckLen = Math.min(0.24, Math.max(0.13, estHeadH * 0.6 * H.neck));
+  const neckLen = Math.min(0.14, Math.max(0.08, estHeadH * 0.32 * H.neck));
   const yNeckTop = yNeck + neckLen;
 
   return {

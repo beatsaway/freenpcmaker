@@ -347,22 +347,23 @@ export function buildLatheBody(mats, opts = {}) {
   const joinZ = HIP_Z * 0.5;
   const waistY = hip.top; // === torso.bot
 
-  // --- Trunk: one continuous lathe (pelvis → waist → chest → open neck hole) ---
-  // Separate meshes on pelvis vs spine_02 split apart when the spine bends;
-  // a single volume + Y skin bands keeps the waist sealed in animation.
-  // Top stays open at rNeckJoin so a separate lathe neck mates to it.
+  // --- Trunk+neck: one continuous lathe (pelvis → waist → chest → neck top) ---
+  // Same radius at chest→neck join so there is no separate mating hole/seam.
   {
     const y0 = hip.bot;
-    const y1 = torso.top;
-    const rNeckJoin = L.rNeckJoin ?? L.neckR * 1.02;
+    const yNeckJoin = torso.top; // === neck.bot
+    const y1 = neck.top;
+    const rNeck = L.neckR ?? L.rNeckJoin ?? 0.034;
     const pts = profileFromKeys(
       [
         { y: y0, r: rHip * 0.72 },
         { y: mix(y0, waistY, 0.45), r: rHip },
         { y: waistY, r: rJoin },
-        { y: mix(waistY, y1, 0.45), r: rChest },
-        { y: mix(waistY, y1, 0.82), r: rChest * 0.92 },
-        { y: y1, r: rNeckJoin },
+        { y: mix(waistY, yNeckJoin, 0.45), r: rChest },
+        { y: mix(waistY, yNeckJoin, 0.82), r: rChest * 0.92 },
+        { y: yNeckJoin, r: rNeck },
+        { y: mix(yNeckJoin, y1, 0.55), r: rNeck * 0.97 },
+        { y: y1, r: rNeck * 0.92 },
       ],
       3
     );
@@ -370,30 +371,44 @@ export function buildLatheBody(mats, opts = {}) {
     const geo = new THREE.LatheGeometry(pts, segs, 0, Math.PI * 2);
     geo.computeVertexNormals();
 
-    // Two materials (bottom cloth / top cloth) split at the waist ring
+    // Three materials: bottom cloth / top cloth / neck skin
     const matBot = m(0);
     const matTop = m(1);
+    const matNeck = m(2);
     const index = geo.index;
     const pos = geo.attributes.position;
     const botIdx = [];
     const topIdx = [];
+    const neckIdx = [];
     for (let i = 0; i < index.count; i += 3) {
       const a = index.getX(i);
       const b = index.getX(i + 1);
       const c = index.getX(i + 2);
       const cy = (pos.getY(a) + pos.getY(b) + pos.getY(c)) / 3;
-      const dest = cy < waistY ? botIdx : topIdx;
+      const dest = cy < waistY ? botIdx : cy < yNeckJoin ? topIdx : neckIdx;
       dest.push(a, b, c);
     }
-    const merged = new Uint32Array(botIdx.length + topIdx.length);
-    merged.set(botIdx, 0);
-    merged.set(topIdx, botIdx.length);
+    const merged = new Uint32Array(botIdx.length + topIdx.length + neckIdx.length);
+    let off = 0;
+    merged.set(botIdx, off);
+    off += botIdx.length;
+    merged.set(topIdx, off);
+    off += topIdx.length;
+    merged.set(neckIdx, off);
     geo.setIndex(new THREE.BufferAttribute(merged, 1));
     geo.clearGroups();
-    if (botIdx.length) geo.addGroup(0, botIdx.length, 0);
-    if (topIdx.length) geo.addGroup(botIdx.length, topIdx.length, 1);
+    off = 0;
+    if (botIdx.length) {
+      geo.addGroup(off, botIdx.length, 0);
+      off += botIdx.length;
+    }
+    if (topIdx.length) {
+      geo.addGroup(off, topIdx.length, 1);
+      off += topIdx.length;
+    }
+    if (neckIdx.length) geo.addGroup(off, neckIdx.length, 2);
 
-    const mesh = new THREE.Mesh(geo, [matBot, matTop]);
+    const mesh = new THREE.Mesh(geo, [matBot, matTop, matNeck]);
     mesh.name = "trunk";
     mesh.userData.meshMethod = "lathe";
     mesh.userData.skinBone = "spine_02";
@@ -401,14 +416,15 @@ export function buildLatheBody(mats, opts = {}) {
     mesh.userData.latheR1 = pts[pts.length - 1].x;
     mesh.userData.latheY0 = y0;
     mesh.userData.latheY1 = y1;
-    // Soft blend pelvis → spine across the waist so the join never opens
+    // Soft blend pelvis → spine → neck so the join never opens
     mesh.userData.skinBands = {
       blend: 0.07,
       joints: [
         { bone: "pelvis", t0: -1e6, t1: waistY - 0.02 },
         { bone: "spine_01", t0: waistY - 0.02, t1: waistY + torso.h * 0.22 },
         { bone: "spine_02", t0: waistY + torso.h * 0.22, t1: waistY + torso.h * 0.62 },
-        { bone: "spine_03", t0: waistY + torso.h * 0.62, t1: 1e6 },
+        { bone: "spine_03", t0: waistY + torso.h * 0.62, t1: yNeckJoin },
+        { bone: "neck_01", t0: yNeckJoin, t1: 1e6 },
       ],
     };
 
@@ -416,49 +432,17 @@ export function buildLatheBody(mats, opts = {}) {
       material: matBot,
       skinBone: "pelvis",
       r0: rHip * 0.72,
-      r1: rNeckJoin,
-      // Bottom cap → pelvis; top open to mate with separate neck
+      r1: rNeck * 0.92,
+      // Bottom cap → pelvis; closed neck top is the head seat
       cap0: true,
-      cap1: false,
+      cap1: true,
+      material1: matNeck,
+      skinBone1: "neck_01",
     });
+    // Top cap should use neck material if withEndCaps supports it — check below
     trunk.scale.z = joinScaleZ;
     trunk.position.z = joinZ;
     g.add(trunk);
-  }
-
-  // --- Neck (separate lathe; bottom matches torso hole, head sits on top) ---
-  {
-    const rJoin = L.rNeckJoin ?? L.neckR * 1.02;
-    // Taper thinner above the hole — shaft must not read thicker than the torso opening
-    const rMid = L.neckR * 0.9;
-    const rTop = L.neckR * 0.84;
-    const pts = profileFromKeys(
-      [
-        { y: neck.bot, r: rJoin },
-        { y: neck.y, r: rMid },
-        { y: neck.top, r: rTop },
-      ],
-      2
-    );
-    const mesh = latheMesh(pts, {
-      material: m(2),
-      name: "neck",
-      skinBone: "neck_01",
-      segments: segs,
-    });
-    const neckMesh = withEndCaps(mesh, {
-      material: m(2),
-      skinBone: "neck_01",
-      r0: rJoin,
-      r1: rTop,
-      // Open bottom mates torso hole; closed top is a seat for the head
-      cap0: false,
-      cap1: true,
-    });
-    // Same joinZ + Z squash as trunk so the neck fits the elliptical hole
-    neckMesh.position.z = joinZ;
-    neckMesh.scale.z = joinScaleZ;
-    g.add(neckMesh);
   }
 
   // --- Legs: thigh + shin + L-foot (ankle hole faces shin, same rAnkle) ---

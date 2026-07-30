@@ -143,7 +143,9 @@ export function withEndCaps(shaftMesh, opts = {}) {
   g.add(shaftMesh);
 
   const mat = opts.material || shaftMesh.material;
+  const mat1 = opts.material1 || mat;
   const bone = opts.skinBone || shaftMesh.userData.skinBone;
+  const bone1 = opts.skinBone1 || bone;
   const segs = opts.segments ?? 12;
   const y0 = shaftMesh.userData.latheY0 ?? 0;
   const y1 = shaftMesh.userData.latheY1 ?? 0;
@@ -158,7 +160,7 @@ export function withEndCaps(shaftMesh, opts = {}) {
     g.add(c0);
   }
   if (do1 && r1 > 0.002) {
-    const c1 = capDisc(r1, { material: mat, skinBone: bone, segments: segs, face: "+y", name: "cap1" });
+    const c1 = capDisc(r1, { material: mat1, skinBone: bone1, segments: segs, face: "+y", name: "cap1" });
     c1.position.y = y1;
     g.add(c1);
   }
