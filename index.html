@@ -5,101 +5,110 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Free NPC Maker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500&family=Orbitron:wght@500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./demo/demo.css">
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500&family=Orbitron:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg0: #1a1714;
+    --bg1: #2a231c;
+    --ink: #f3ebe0;
+    --muted: #a89a88;
+    --line: #3d342a;
+    --accent: #e8b86d;
   }
-}
-</script>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    font-family: "IBM Plex Sans", sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(ellipse 90% 60% at 50% -10%, #4a3a28 0%, transparent 55%),
+      linear-gradient(165deg, var(--bg1), var(--bg0));
+  }
+  .wrap {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 28px 18px 40px;
+  }
+  .card {
+    width: min(420px, 100%);
+    text-align: center;
+  }
+  h1 {
+    margin: 0;
+    font-family: Orbitron, sans-serif;
+    font-weight: 800;
+    font-size: clamp(1.35rem, 4.5vw, 1.85rem);
+    letter-spacing: 0.04em;
+  }
+  .tag {
+    margin: 10px 0 28px;
+    color: var(--muted);
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+  .versions {
+    display: grid;
+    gap: 12px;
+  }
+  a.ver {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    padding: 18px 16px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(0,0,0,0.28);
+    transition: border-color 0.15s, background 0.15s, transform 0.15s;
+  }
+  a.ver:hover, a.ver:focus-visible {
+    border-color: var(--accent);
+    background: rgba(232, 184, 109, 0.08);
+    transform: translateY(-1px);
+    outline: none;
+  }
+  a.ver .name {
+    font-family: Orbitron, sans-serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.06em;
+  }
+  a.ver .meta {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+  a.ver.latest .name::after {
+    content: " · latest";
+    color: var(--accent);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .hint {
+    margin-top: 22px;
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+</style>
 </head>
-<body class="prestart">
-<div id="splash" class="splash" role="button" tabindex="0" aria-label="Tap to start Free NPC Maker">
-  <div class="splash-inner">
-    <p class="splash-title">Free NPC Maker</p>
-    <p class="splash-tag">Mesh, texture, rig, animation — all included.</p>
-    <p class="splash-hint">Tap to start</p>
-  </div>
-</div>
-
-<header id="topbar" class="app-header">
-  <button type="button" id="btn-about" class="app-title" title="About Free NPC Maker" aria-haspopup="dialog" aria-controls="about-dialog">Free NPC Maker</button>
-</header>
-
-<dialog id="about-dialog" class="about-dialog">
-  <form method="dialog" class="about-card">
-    <h2>Free NPC Maker</h2>
-    <p>Procedurally generate a full character in one place: mesh, texture, rig, and animation. Great for indie projects.</p>
-    <p>Meshes are built with SDF (signed distance fields) → marching cubes → weld &amp; smooth. Soft-union keeps body and clothes as continuous shells instead of separate tubes with gaps.</p>
-    <p>Huge thanks to <a href="https://mesh2motion.org/" target="_blank" rel="noopener noreferrer">Mesh2Motion</a> for the human rig and animation library that power auto-rig and playback.</p>
-    <p>Developed by Beats Away, a multi-media designer. Please <a href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">support this project</a> for continuous updates and improvements.</p>
-    <button type="submit" class="secondary" value="ok">Close</button>
-  </form>
-</dialog>
-
-<canvas id="c"></canvas>
-
-<footer id="bottom">
-  <div class="dock-tabs" role="tablist">
-    <div class="dock-tab active" role="tab" tabindex="0" data-tab="code" aria-selected="true">
-      <span class="sum-label">Genes</span>
-      <button type="button" id="btn-random">✦ Lucky Roll</button>
-    </div>
-    <div class="dock-tab" role="tab" tabindex="0" data-tab="look" aria-selected="false">
-      <button type="button" class="rand-star on sum-star" id="rand-look-mod" title="Include Look in Randomize" aria-label="Toggle Look in Randomize">✦</button>
-      <span class="sum-label">Look</span>
-      <button type="button" class="tiny sum-action" id="btn-export-mesh" disabled title="Download this avatar mesh with rig (no animations)">Download</button>
-    </div>
-    <div class="dock-tab" role="tab" tabindex="0" data-tab="anim" aria-selected="false">
-      <button type="button" class="rand-star on sum-star" id="rand-anim-mod" title="Include Animation in Randomize" aria-label="Toggle Animation in Randomize">✦</button>
-      <span class="sum-label">Animation</span>
-      <button type="button" class="tiny sum-action" id="btn-export" disabled title="Download with checked clips">Download</button>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Free NPC Maker</h1>
+      <p class="tag">Pick a version — tap to start</p>
+      <div class="versions">
+        <a class="ver latest" href="./v1.01/">
+          <div class="name">v1.01</div>
+          <div class="meta">Current build — face seating, neck join, hair skull-safe</div>
+        </a>
+        <a class="ver" href="./v1.0/">
+          <div class="name">v1.0</div>
+          <div class="meta">Original push release</div>
+        </a>
+      </div>
+      <p class="hint">Each version opens with its own tap-to-start screen</p>
     </div>
   </div>
-
-  <div class="dock-body">
-    <div class="dock-pane" id="pane-code">
-      <textarea id="look-code" rows="3" spellcheck="false" readonly placeholder="1,edc9a8,1 1 1 1…"></textarea>
-      <div class="row tight">
-        <button type="button" class="secondary" id="btn-look-copy">Copy</button>
-        <button type="button" class="secondary" id="btn-look-apply">Paste</button>
-      </div>
-    </div>
-
-    <div class="dock-pane" id="pane-look" hidden>
-      <div id="controls"></div>
-    </div>
-
-    <div class="dock-pane" id="pane-anim" hidden>
-      <div class="current-clip" id="current-clip-row">
-        <span class="current-clip-lab">Clip:</span>
-        <input type="checkbox" id="current-clip-check" title="Include this clip in download">
-        <span class="current-clip-name" id="current-clip-name">—</span>
-        <label class="anim-speed" title="Animation speed">
-          <span class="anim-speed-lab">Speed</span>
-          <input type="range" id="anim-speed" min="0" max="200" value="50" step="5">
-        </label>
-      </div>
-      <div class="field">
-        <label><span class="lab-text">Filter</span></label>
-        <input type="search" id="anim-filter" placeholder="Filter…" autocomplete="off">
-      </div>
-      <div id="anim-clips" class="clip-list"></div>
-      <div class="clip-toolbar">
-        <button type="button" id="btn-play" class="secondary icon-btn" title="Pause" aria-label="Pause">■</button>
-        <button type="button" class="secondary tiny" id="btn-export-all">All</button>
-        <button type="button" class="secondary tiny" id="btn-export-none">None</button>
-        <span class="count" id="export-count">0</span>
-      </div>
-      <p id="status" class="status">Building…</p>
-    </div>
-  </div>
-</footer>
-
-<a id="download-link" hidden></a>
-<script type="module" src="./demo/demo.js"></script>
 </body>
 </html>

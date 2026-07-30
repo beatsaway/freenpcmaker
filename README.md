@@ -1,23 +1,18 @@
 # Free NPC Maker
 
-Procedurally generate a full character in one place: mesh, texture, rig, and animation. Great for indie projects.
+Version hub — pick a build from the launch page.
+
+| Folder | Version | Notes |
+|--------|---------|--------|
+| `v1.01/` | **latest** | Current build (face seating, neck join, skull-safe hair) |
+| `v1.0/` | classic | Original push release |
 
 ## Run
 
-**Everyday (lean, no npm):** double-click `start.bat`  
-Needs [Python 3](https://www.python.org/) and internet once (Three.js CDN). Opens http://127.0.0.1:8770/
-
-**Vite / Node workflow:** double-click `start-vite.bat`  
-```bash
-npm install
-npm run dev
+```bat
+start.bat
 ```
 
-## Deploy (Netlify)
+Opens http://127.0.0.1:8770/ — tap a version to start.
 
-Connect the GitHub repo — `netlify.toml` builds with `npm run build` and publishes `dist/` (root `index.html`).
-
-## Credits
-
-- Human rig and animation library from [Mesh2Motion](https://mesh2motion.org/) ([mesh2motion-app](https://github.com/Mesh2Motion/mesh2motion-app))
-- Developed by Beats Away — [support this project](https://buymeacoffee.com/beatsaway)
+Each version folder also has its own `start.bat` if you want to run one alone.

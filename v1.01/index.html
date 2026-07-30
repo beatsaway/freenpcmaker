@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Free NPC Maker v1.01</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500&family=Orbitron:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./demo/demo.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body class="prestart">
+<div id="splash" class="splash" role="button" tabindex="0" aria-label="Tap to start Free NPC Maker v1.01">
+  <div class="splash-inner">
+    <p class="splash-title">Free NPC Maker</p>
+    <p class="splash-tag">v1.01 · mesh, texture, rig, animation</p>
+    <p class="splash-hint">Tap to start</p>
+  </div>
+</div>
+
+<header id="topbar" class="app-header">
+  <button type="button" id="btn-about" class="app-title" title="About Free NPC Maker v1.01" aria-haspopup="dialog" aria-controls="about-dialog">Free NPC Maker v1.01</button>
+</header>
+
+<dialog id="about-dialog" class="about-dialog">
+  <form method="dialog" class="about-card">
+    <h2>Free NPC Maker v1.01</h2>
+    <p>Procedurally generate a full character in one place: mesh, texture, rig, and animation. Great for indie projects.</p>
+    <p>Meshes are built as continuous body shells with an SDF / soft-union head, then auto-rigged for playback. Seams between clothing and body parts stay intentional where needed for bone tagging.</p>
+    <p>Huge thanks to <a href="https://mesh2motion.org/" target="_blank" rel="noopener noreferrer">Mesh2Motion</a> for the human rig and animation library that power auto-rig and playback.</p>
+    <p>Developed by Beats Away, a multi-media designer. Please <a href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">support this project</a> for continuous updates and improvements.</p>
+    <button type="submit" class="secondary" value="ok">Close</button>
+  </form>
+</dialog>
+
+<canvas id="c"></canvas>
+
+<footer id="bottom">
+  <div class="dock-tabs" role="tablist">
+    <div class="dock-tab active" role="tab" tabindex="0" data-tab="code" aria-selected="true">
+      <span class="sum-label">Genes</span>
+      <button type="button" id="btn-random">✦ Lucky Roll</button>
+    </div>
+    <div class="dock-tab" role="tab" tabindex="0" data-tab="look" aria-selected="false">
+      <button type="button" class="rand-star on sum-star" id="rand-look-mod" title="Include Look in Randomize" aria-label="Toggle Look in Randomize">✦</button>
+      <span class="sum-label">Look</span>
+      <button type="button" class="tiny sum-action" id="btn-export-mesh" disabled title="Download this avatar mesh with rig (no animations)">Download</button>
+    </div>
+    <div class="dock-tab" role="tab" tabindex="0" data-tab="anim" aria-selected="false">
+      <button type="button" class="rand-star on sum-star" id="rand-anim-mod" title="Include Animation in Randomize" aria-label="Toggle Animation in Randomize">✦</button>
+      <span class="sum-label">Animation</span>
+      <button type="button" class="tiny sum-action" id="btn-export" disabled title="Download with checked clips">Download</button>
+    </div>
+  </div>
+
+  <div class="dock-body">
+    <div class="dock-pane" id="pane-code">
+      <textarea id="look-code" rows="3" spellcheck="false" readonly placeholder="1,edc9a8,1 1 1 1…"></textarea>
+      <div class="row tight">
+        <button type="button" class="secondary" id="btn-look-copy">Copy</button>
+        <button type="button" class="secondary" id="btn-look-apply">Paste</button>
+      </div>
+    </div>
+
+    <div class="dock-pane" id="pane-look" hidden>
+      <div id="controls"></div>
+    </div>
+
+    <div class="dock-pane" id="pane-anim" hidden>
+      <div class="current-clip" id="current-clip-row">
+        <span class="current-clip-lab">Clip:</span>
+        <input type="checkbox" id="current-clip-check" title="Include this clip in download">
+        <span class="current-clip-name" id="current-clip-name">—</span>
+        <label class="anim-speed" title="Animation speed">
+          <span class="anim-speed-lab">Speed</span>
+          <input type="range" id="anim-speed" min="0" max="200" value="50" step="5">
+        </label>
+      </div>
+      <div class="field">
+        <label><span class="lab-text">Filter</span></label>
+        <input type="search" id="anim-filter" placeholder="Filter…" autocomplete="off">
+      </div>
+      <div id="anim-clips" class="clip-list"></div>
+      <div class="clip-toolbar">
+        <button type="button" id="btn-play" class="secondary icon-btn" title="Pause" aria-label="Pause">■</button>
+        <button type="button" class="secondary tiny" id="btn-export-all">All</button>
+        <button type="button" class="secondary tiny" id="btn-export-none">None</button>
+        <span class="count" id="export-count">0</span>
+      </div>
+      <p id="status" class="status">Building…</p>
+    </div>
+  </div>
+</footer>
+
+<a id="download-link" hidden></a>
+<script type="module" src="./demo/demo.js"></script>
+</body>
+</html>

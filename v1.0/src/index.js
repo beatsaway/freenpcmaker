@@ -1,0 +1,65 @@
+export { buildJointMap, JOINT_PLACE_ORDER } from "./rig/jointMap.js";
+export { buildAvatarSceneForRig } from "./rig/buildAvatarScene.js";
+export { autoRigAvatar } from "./rig/autoRig.js";
+export { loadHumanAnimationClips } from "./rig/animLibrary.js";
+export {
+  adaptClipToProportions,
+  getAdaptedClips,
+  HUMAN_TEMPLATE_HEIGHT,
+} from "./rig/adaptClip.js";
+export { buildStack } from "./parts/Stack.js";
+export { faceParams, skullSize } from "./parts/Stack.js";
+export { applyEyeDistanceCap } from "./faceLimits.js";
+export { encodeLookCode, decodeLookCode, applyLookCode, LOOK_CODE_VERSION } from "./lookCode.js";
+export {
+  AvatarBuilder,
+  LowPolyAvatar,
+  resolveConfig,
+  randomConfig,
+  DEFAULT_CONFIG,
+  PRESETS,
+  createPatternTexture,
+  clothMaterial,
+  BODY_SHAPES,
+  EYE_STYLES,
+  EYE_SCALE_MIN,
+  EYE_SCALE_MAX,
+  HEAD_SCALE_MIN,
+  HEAD_SCALE_MAX,
+  maxEyeScaleForDistance,
+  minEyeDistanceForScale,
+  clampEyeScale,
+  clampEyeDistance,
+  clampPupilScale,
+  clampPupilLook,
+  maxEyeDistanceForWidth,
+  eyeHalfSpread,
+  EYE_DISTANCE_MIN,
+  EYE_DISTANCE_MAX,
+  EYE_GAP_MIN,
+  PUPIL_SCALE_MIN,
+  PUPIL_SCALE_MAX,
+  PUPIL_LOOK_MIN,
+  PUPIL_LOOK_MAX,
+  FACE_WIDTH_MIN,
+  FACE_WIDTH_MAX,
+  FACE_DROP_MIN,
+  FACE_DROP_MAX,
+  BUTTON_SIZE_MIN,
+  BUTTON_SIZE_MAX,
+  maxEyeDropForNose,
+  minNoseDropForEye,
+  clampFaceFeatureDrops,
+  BROW_STYLES,
+  NOSE_STYLES,
+  EAR_STYLES,
+  HAIR_STYLES,
+  HAIR_SHORT,
+  HAIR_LONG,
+  HAT_STYLES,
+  TOP_STYLES,
+  BOTTOM_STYLES,
+  SHOE_STYLES,
+  PATTERN_TYPES,
+  randomPattern,
+} from "./AvatarBuilder.js";

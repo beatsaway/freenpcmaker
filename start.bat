@@ -7,6 +7,7 @@ set URL=http://127.0.0.1:%PORT%/
 
 echo.
 echo === Free NPC Maker ===
+echo Versions: v1.01 (latest) · v1.0
 echo Lean local server (Python + Three.js CDN — no npm)
 echo Freeing port %PORT% ...
 
@@ -17,7 +18,7 @@ timeout /t 1 /nobreak >nul
 
 where python >nul 2>&1
 if errorlevel 1 (
-  echo Python not found. Install Python 3, or use start-vite.bat instead.
+  echo Python not found. Install Python 3.
   pause
   exit /b 1
 )
