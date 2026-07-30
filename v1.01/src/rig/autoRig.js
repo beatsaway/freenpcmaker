@@ -15,15 +15,16 @@ import {
 } from "./bonePlacer.js";
 import { applyExplicitOrDistanceSkin } from "./explicitSkin.js";
 import { HUMAN_TEMPLATE_HEIGHT } from "./adaptClip.js";
+import { assetUrl } from "./assetUrl.js";
 
-const RIG_URL = "/rigs/rig-human.glb";
+const RIG_URL = () => assetUrl("rigs/rig-human.glb");
 
 let _rigTemplate = null;
 
 async function loadHumanArmature() {
   if (_rigTemplate) return _rigTemplate.clone(true);
   const loader = new GLTFLoader();
-  const gltf = await loader.loadAsync(RIG_URL);
+  const gltf = await loader.loadAsync(RIG_URL());
   let armature = null;
   gltf.scene.traverse((child) => {
     if (armature || child.type !== "Bone") return;
