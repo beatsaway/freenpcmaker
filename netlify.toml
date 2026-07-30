@@ -1,0 +1,49 @@
+# Free NPC Maker hub — static publish (no Vite build required).
+# Three.js loads from CDN via import maps in each version's index.html.
+
+[build]
+  command = "echo Static hub publish"
+  publish = "."
+
+# Mesh2Motion assets live under each version's ./static (same as local serve.py).
+# Absolute /animations and /rigs (used by the apps) → latest copy.
+[[redirects]]
+  from = "/animations/*"
+  to = "/v1.01/static/animations/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/rigs/*"
+  to = "/v1.01/static/rigs/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/v1.0/animations/*"
+  to = "/v1.0/static/animations/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/v1.0/rigs/*"
+  to = "/v1.0/static/rigs/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/v1.01/animations/*"
+  to = "/v1.01/static/animations/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/v1.01/rigs/*"
+  to = "/v1.01/static/rigs/:splat"
+  status = 200
+
+# Pretty folder URLs
+[[redirects]]
+  from = "/v1.0"
+  to = "/v1.0/"
+  status = 301
+
+[[redirects]]
+  from = "/v1.01"
+  to = "/v1.01/"
+  status = 301

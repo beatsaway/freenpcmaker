@@ -1,8 +1,5 @@
+# Used only if you deploy this version folder alone (set Netlify base dir to v1.0).
+# Hub site uses the repo-root netlify.toml instead.
 [build]
   command = "npm run build"
   publish = "dist"
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
