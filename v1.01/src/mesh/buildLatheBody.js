@@ -354,7 +354,7 @@ export function buildLatheBody(mats, opts = {}) {
   {
     const y0 = hip.bot;
     const y1 = torso.top;
-    const rNeckJoin = L.rNeckJoin ?? L.neckR * 1.08;
+    const rNeckJoin = L.rNeckJoin ?? L.neckR * 1.02;
     const pts = profileFromKeys(
       [
         { y: y0, r: rHip * 0.72 },
@@ -428,13 +428,14 @@ export function buildLatheBody(mats, opts = {}) {
 
   // --- Neck (separate lathe; bottom matches torso hole, head sits on top) ---
   {
-    const rJoin = L.rNeckJoin ?? L.neckR * 1.08;
-    // Slightly wider top so the column fills under the skull from the side/back
-    const rTop = L.neckR * 1.05;
+    const rJoin = L.rNeckJoin ?? L.neckR * 1.02;
+    // Taper thinner above the hole — shaft must not read thicker than the torso opening
+    const rMid = L.neckR * 0.9;
+    const rTop = L.neckR * 0.84;
     const pts = profileFromKeys(
       [
         { y: neck.bot, r: rJoin },
-        { y: neck.y, r: L.neckR * 1.02 },
+        { y: neck.y, r: rMid },
         { y: neck.top, r: rTop },
       ],
       2
@@ -454,8 +455,9 @@ export function buildLatheBody(mats, opts = {}) {
       cap0: false,
       cap1: true,
     });
-    // Align with trunk join so the head nests on the neck, not floating in front
+    // Same joinZ + Z squash as trunk so the neck fits the elliptical hole
     neckMesh.position.z = joinZ;
+    neckMesh.scale.z = joinScaleZ;
     g.add(neckMesh);
   }
 

@@ -106,7 +106,7 @@ export function skullCrownLocalY(sk) {
 }
 
 /** How far the chin tip sinks past neck.top so the cranial ball sits on the neck. */
-export const HEAD_NECK_SINK = 0.07;
+export const HEAD_NECK_SINK = 0.095;
 
 /**
  * @returns anchors + sizes for every segment (centers + tops/bots)
@@ -131,8 +131,8 @@ export function buildStack(cfg = {}) {
   const crownLocal = skullCrownLocalY(sk);
   const jawLen = Math.abs(seatLocal);
   const Rball = sk.R ?? 0.06;
-  // Prefer seating ball on neck; fall back to sibling 0.055 sink
-  const sink = Math.max(HEAD_NECK_SINK, jawLen - Rball - 0.01);
+  // Prefer seating ball deep on neck so the column reaches the occiput, not just ball mid-bottom
+  const sink = Math.max(HEAD_NECK_SINK, jawLen - Rball * 0.72);
   const headBot = yNeckTop - sink;
   const headY = headBot - seatLocal;
   const headTop = headY + crownLocal;
@@ -169,10 +169,12 @@ export function buildStack(cfg = {}) {
   const handX = wristX + hh * 0.45;
   // Clavicle sits between chest and shoulder (never past upperarm)
   const clavicleX = Math.min(shoulderSocketX * 0.62, Math.max(tw * 0.28, shoulderSocketX - ua * 0.35));
-  // Trunk/neck share joinZ; head sits forward enough that the occiput sits over the neck
-  // column (front still reads nested). Too little nest → nape gap; too much → floating face.
+  // Trunk/neck share joinZ. Nest head forward so the occiput sits over the neck
+  // column (headZ - hd ≈ joinZ − neck back). Too little → nape gap; too much → face floats.
   const joinZ = (hipZ != null ? hipZ : -0.035) * 0.5;
-  const nest = Math.min(0.05, Math.max(0.028, Rball * 0.52));
+  const hd = sk.hd ?? Rball;
+  const neckBack = (L.neckR ?? 0.034) * 0.45;
+  const nest = Math.min(0.1, Math.max(0.042, hd * 0.92 - neckBack));
   const headZ = joinZ + nest;
   const offsets = {
     ARM_Z: 0.04,

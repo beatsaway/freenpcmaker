@@ -52,10 +52,6 @@ export function humanLayout(cfg = {}) {
   const yChest = yWaist + 0.27 * H.torso * S.torso;
   const yShoulder = yWaist + 0.33 * H.torso * S.torso;
   const yNeck = yWaist + torsoLen;
-  // Neck ≈ ~1/2 of head height so the column reaches under the occiput (side/back)
-  const estHeadH = Math.max(0.2, yNeck / 6.5);
-  const neckLen = Math.min(0.22, Math.max(0.12, estHeadH * 0.52 * H.neck));
-  const yNeckTop = yNeck + neckLen;
 
   // Arms track a blend of torso + legs; floor/cap vs Mesh2Motion (~0.30 / 0.28)
   // so long-limb NPCs don't stretch upperarm past a usable elbow split.
@@ -68,9 +64,15 @@ export function humanLayout(cfg = {}) {
   const d = S.d;
   const legX = Math.max(0.08, 0.1 * w) + (legThick - 1) * 0.012;
   const shoulderX = 0.18 * w * Math.sqrt(chestWidth);
-  // Shared join radius: torso top hole ↔ neck bottom hole
-  const neckR = 0.042 * mix(0.92, 1.08, (w - 0.92) / 0.16);
-  const rNeckJoin = neckR * 1.08;
+
+  // Shared join radius: torso top hole ↔ neck bottom (same circle before Z squash)
+  const neckR = 0.034 * mix(0.92, 1.06, (w - 0.92) / 0.16);
+  const rNeckJoin = neckR * 1.02;
+
+  // Neck length — long enough that after deep skull sink the column still reaches the occiput
+  const estHeadH = Math.max(0.2, yNeck / 6.5);
+  const neckLen = Math.min(0.24, Math.max(0.13, estHeadH * 0.6 * H.neck));
+  const yNeckTop = yNeck + neckLen;
 
   return {
     yFoot,
