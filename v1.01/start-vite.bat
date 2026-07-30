@@ -7,7 +7,7 @@ set URL=http://127.0.0.1:%PORT%/
 
 echo.
 echo === Free NPC Maker v1.01 (Vite) ===
-echo Needs Node.js — use for npm build / Netlify-style workflow.
+echo Needs Node.js — use for npm / Vite workflow.
 echo Freeing port %PORT% ...
 
 powershell -NoProfile -Command ^
