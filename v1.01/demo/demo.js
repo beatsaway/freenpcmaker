@@ -45,6 +45,9 @@ import {
   BROW_LENGTH_MAX,
   NOSE_WIDTH_MIN,
   NOSE_WIDTH_MAX,
+  NOSE_SCALE_MIN,
+  NOSE_SCALE_MAX,
+  LIP_COLORS,
   maxEyeDropForNose,
   minNoseDropForEye,
   clampFaceFeatureDrops,
@@ -199,10 +202,13 @@ const RANDOM_PATHS = [
   "brows.length",
   "nose.style",
   "nose.width",
+  "nose.scale",
   "mouth.style",
+  "mouth.scale",
   "mouth.lipThickness",
   "mouth.curvature",
   "mouth.lipLength",
+  "mouth.color",
   "ears.style",
   "hair.style",
   "hair.color",
@@ -798,13 +804,19 @@ function buildLookControls() {
     c.brows.length = v;
   }, "brows.length");
   selectField("Nose", cat.noseStyles, () => c.nose.style, (v) => { c.nose.style = v; }, "nose.style");
+  rangeField("Nose length", NOSE_SCALE_MIN, NOSE_SCALE_MAX, 0.05, () => c.nose.scale ?? 0.78, (v) => {
+    c.nose.scale = v;
+  }, "nose.scale");
   rangeField("Nose width", NOSE_WIDTH_MIN, NOSE_WIDTH_MAX, 0.05, () => c.nose.width ?? 0.9, (v) => {
     c.nose.width = v;
   }, "nose.width");
-  if (!c.mouth) c.mouth = { style: "smile", scale: 1, lipThickness: 1, curvature: 0.55, lipLength: 1 };
+  if (!c.mouth) c.mouth = { style: "smile", scale: 1, lipThickness: 1, curvature: 0.55, lipLength: 1, color: 0xc47880 };
   selectField("Mouth", cat.mouthStyles || ["smile", "flat", "wide", "small", "none"], () => c.mouth.style || "smile", (v) => {
     c.mouth.style = v;
   }, "mouth.style");
+  rangeField("Mouth size", 0.45, 1.55, 0.05, () => c.mouth.scale ?? 0.62, (v) => {
+    c.mouth.scale = v;
+  }, "mouth.scale");
   rangeField("Lip length", LIP_LENGTH_MIN, LIP_LENGTH_MAX, 0.05, () => c.mouth.lipLength ?? 1, (v) => {
     c.mouth.lipLength = v;
   }, "mouth.lipLength");
@@ -814,6 +826,7 @@ function buildLookControls() {
   rangeField("Lip curve", LIP_CURVE_MIN, LIP_CURVE_MAX, 0.05, () => c.mouth.curvature ?? 0.55, (v) => {
     c.mouth.curvature = v;
   }, "mouth.curvature");
+  colorField("Lip color", () => c.mouth.color ?? 0xc47880, (v) => { c.mouth.color = v; }, "mouth.color");
   selectField("Ears", cat.earStyles, () => c.ears.style, (v) => { c.ears.style = v; }, "ears.style");
 
   section("Hair / hat");

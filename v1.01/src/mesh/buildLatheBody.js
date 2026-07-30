@@ -429,11 +429,12 @@ export function buildLatheBody(mats, opts = {}) {
   // --- Neck (separate lathe; bottom matches torso hole, head sits on top) ---
   {
     const rJoin = L.rNeckJoin ?? L.neckR * 1.08;
-    const rTop = L.neckR * 0.95;
+    // Slightly wider top so the column fills under the skull from the side/back
+    const rTop = L.neckR * 1.05;
     const pts = profileFromKeys(
       [
         { y: neck.bot, r: rJoin },
-        { y: neck.y, r: L.neckR },
+        { y: neck.y, r: L.neckR * 1.02 },
         { y: neck.top, r: rTop },
       ],
       2

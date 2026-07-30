@@ -52,9 +52,9 @@ export function humanLayout(cfg = {}) {
   const yChest = yWaist + 0.27 * H.torso * S.torso;
   const yShoulder = yWaist + 0.33 * H.torso * S.torso;
   const yNeck = yWaist + torsoLen;
-  // Neck ≈ ~2/5 of head height so the column reaches the skull (was ~0.28 → float gap)
+  // Neck ≈ ~1/2 of head height so the column reaches under the occiput (side/back)
   const estHeadH = Math.max(0.2, yNeck / 6.5);
-  const neckLen = Math.min(0.18, Math.max(0.11, estHeadH * 0.42 * H.neck));
+  const neckLen = Math.min(0.22, Math.max(0.12, estHeadH * 0.52 * H.neck));
   const yNeckTop = yNeck + neckLen;
 
   // Arms track a blend of torso + legs; floor/cap vs Mesh2Motion (~0.30 / 0.28)

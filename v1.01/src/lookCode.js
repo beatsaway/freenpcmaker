@@ -90,7 +90,7 @@ export function encodeLookCode(cfg = {}, anim = {}) {
     [c.face?.eyeDistance, c.face?.roundness, c.face?.length, c.face?.width, c.face?.eyeDrop, c.face?.noseDrop, c.face?.mouthDrop].map(f2).join(" "),
     `${idx(EYE_STYLES, c.eyes?.whiteStyle || c.eyes?.style)} ${idx(EYE_PUPIL_STYLES, c.eyes?.pupilStyle || "circle")} ${hex6(c.eyes?.color)} ${f2(c.eyes?.scale)} ${f2(c.eyes?.pupilScale ?? 0.55)} ${f2(c.eyes?.pupilX ?? 0)} ${f2(c.eyes?.pupilY ?? 0)}`,
     String(idx(BROW_STYLES, c.brows?.style)),
-    `${idx(NOSE_STYLES, c.nose?.style)} ${f2(c.nose?.width ?? 0.9)}`,
+    `${idx(NOSE_STYLES, c.nose?.style)} ${f2(c.nose?.width ?? 0.9)} ${f2(c.nose?.scale ?? 0.78)}`,
     String(idx(EAR_STYLES, c.ears?.style)),
     `${idx(HAIR_STYLES, c.hair?.style)} ${hex6(c.hair?.color)}`,
     `${idx(HAT_STYLES, c.hat?.style)} ${hex6(c.hat?.color)}`,
@@ -182,8 +182,8 @@ function partialFromMap(map, anim) {
     const n = map.nose;
     partial.nose = {
       style: pick(NOSE_STYLES, n[0]),
-      scale: 0.78,
       width: num(n[1], 0.9),
+      scale: num(n[2], 0.78),
     };
   }
   if (map.ears) partial.ears = { style: pick(EAR_STYLES, map.ears[0]), scale: 1 };

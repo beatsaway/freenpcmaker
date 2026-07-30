@@ -296,8 +296,9 @@ export class FaceFeatures {
     if (nose) {
       // Shift attach origin so the tip lands on tipY
       const originY = tipY - tip.y;
-      const surf = FaceFeatures.skinZ(headMesh, 0, originY, faceOpts, hd, 0.008);
-      nose.position.set(0, originY, surf);
+      // Seat flush on skin — small sink so the bridge root is in the face, not floating
+      const surf = FaceFeatures.skinZ(headMesh, 0, originY, faceOpts, hd, 0.001);
+      nose.position.set(0, originY, surf - 0.003);
       nose.name = "nose";
       nose.userData.skinBone = "head";
       markFaceFeature(nose);
@@ -311,9 +312,9 @@ export class FaceFeatures {
 
     const faceSc = faceFeatureScale(hw, hh);
     const sc = (cfg.mouth?.scale ?? 0.62) * faceSc;
-    const thick = Math.min(1.85, Math.max(0.45, Number(cfg.mouth?.lipThickness) || 1));
+    const thick = Math.min(1.85, Math.max(0.35, Number(cfg.mouth?.lipThickness) || 1));
     const curve = Math.min(1, Math.max(-1, Number(cfg.mouth?.curvature) ?? 0.55));
-    const lipLen = Math.min(1.65, Math.max(0.55, Number(cfg.mouth?.lipLength ?? cfg.mouth?.length) || 1));
+    const lipLen = Math.min(1.7, Math.max(0.45, Number(cfg.mouth?.lipLength ?? cfg.mouth?.length) || 1));
     const lipCol = cfg.mouth?.color ?? 0xc47880;
     const lip = basicMat(lipCol, 0.55);
     lip.polygonOffset = true;
@@ -367,8 +368,8 @@ export class FaceFeatures {
         const t = (t0 + t1) * 0.5;
         const x = t * baseW * widthScale * 0.5;
         const y = lipYAt(t, ySign);
-        const surf = FaceFeatures.skinZ(headMesh, x, y, faceOpts, hd, 0.01);
-        const z = surf + depth * 0.55;
+        const surf = FaceFeatures.skinZ(headMesh, x, y, faceOpts, hd, 0.002);
+        const z = surf + depth * 0.4;
         // Tangent tilt along the smile curve
         const yL = lipYAt(t0, ySign);
         const yR = lipYAt(t1, ySign);

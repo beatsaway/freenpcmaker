@@ -17,6 +17,23 @@ function clampButtonSize(n) {
 }
 
 /**
+ * World Z of the painted trunk front at chest (matches buildLatheBody seating).
+ * Accents must use this — raw chestRZ ignores joinZ + scale.z and floats in front.
+ */
+function clothesFrontZ(st) {
+  const L = st.L || {};
+  const hipZ = L.hipZ ?? st.offsets?.HIP_Z ?? -0.035;
+  const joinZ = (hipZ != null ? hipZ : -0.035) * 0.5;
+  const chestRX = L.chestRX ?? (st.tw ?? 0.2) * 0.5;
+  const chestRZ = L.chestRZ ?? (st.td ?? 0.2) * 0.5;
+  const waistRX = L.waistRX ?? chestRX;
+  const waistRZ = L.waistRZ ?? chestRZ;
+  const rFront = Math.max(chestRX, chestRZ);
+  const scaleZ = (waistRZ / Math.max(1e-6, waistRX)) * 0.96;
+  return joinZ + rFront * scaleZ;
+}
+
+/**
  * Clothing: bottoms + shoes as meshes; tops are painted onto the body trunk/arms
  * (no separate upper shell — that peeled off the back when the spine bent).
  */
@@ -83,14 +100,14 @@ export class Clothes {
     const n = clampButtonCount(count);
     const btnSize = Math.max(0.008, size);
     const btn = clothMaterial(color, { type: "solid" });
-    const chestZ = st.L?.chestRZ ?? st.td * 0.5;
-    const btnZ = chestZ + 0.014 + btnSize * 0.15;
+    const depth = Math.max(0.008, btnSize * 0.65);
+    // Sit on cloth surface — half-depth out from trunk front + tiny ease
+    const btnZ = clothesFrontZ(st) + depth * 0.5 + 0.003;
     const top = yStart ?? st.torso.top - 0.035;
     const botHint = yEnd ?? st.torso.y - st.torso.h * 0.12;
     const minSpacing = btnSize * 2.15;
     const regionSpan = Math.abs(top - botHint);
     const spacing = n <= 1 ? 0 : Math.max(minSpacing, regionSpan / (n - 1));
-    const depth = Math.max(0.008, btnSize * 0.65);
     for (let i = 0; i < n; i++) {
       const y = top - i * spacing;
       const m = roundBoxMesh(btnSize, btnSize, depth, btn, 0, y, btnZ, btnSize * 0.28);
@@ -111,10 +128,21 @@ export class Clothes {
     const st = buildStack(cfg);
     const btnScale = clampButtonSize(top.buttonSize ?? 1.4);
     const btnBase = 0.014 * btnScale;
+    const frontZ = clothesFrontZ(st);
 
     if (style === "polo") {
       const collar = clothMaterial(top.pattern?.color2 ?? 0xffffff, { type: "solid" });
-      const collarM = roundBoxMesh(0.08, 0.024, 0.04, collar, 0, st.torso.top - 0.012, 0.055, 0.006);
+      const collarD = 0.028;
+      const collarM = roundBoxMesh(
+        0.08,
+        0.024,
+        collarD,
+        collar,
+        0,
+        st.torso.top - 0.012,
+        frontZ + collarD * 0.5 + 0.002,
+        0.006
+      );
       collarM.userData.skinBone = "spine_03";
       g.add(collarM);
       const n = clampButtonCount(top.buttons ?? 3);
@@ -127,14 +155,15 @@ export class Clothes {
       });
     } else if (style === "jacket") {
       const accent = clothMaterial(top.pattern?.color2 ?? 0xffffff, { type: "solid" });
+      const collarD = 0.024;
       const collarM = roundBoxMesh(
         Math.min(0.1, st.tw * 0.38),
         0.022,
-        0.028,
+        collarD,
         accent,
         0,
         st.torso.top + 0.004,
-        (st.L?.chestRZ ?? 0.1) + 0.016,
+        frontZ + collarD * 0.5 + 0.002,
         0.006
       );
       collarM.userData.skinBone = "spine_03";

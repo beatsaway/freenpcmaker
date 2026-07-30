@@ -106,7 +106,7 @@ export function skullCrownLocalY(sk) {
 }
 
 /** How far the chin tip sinks past neck.top so the cranial ball sits on the neck. */
-export const HEAD_NECK_SINK = 0.055;
+export const HEAD_NECK_SINK = 0.07;
 
 /**
  * @returns anchors + sizes for every segment (centers + tops/bots)
@@ -169,10 +169,10 @@ export function buildStack(cfg = {}) {
   const handX = wristX + hh * 0.45;
   // Clavicle sits between chest and shoulder (never past upperarm)
   const clavicleX = Math.min(shoulderSocketX * 0.62, Math.max(tw * 0.28, shoulderSocketX - ua * 0.35));
-  // Trunk/neck share joinZ; head sits slightly forward so the neck nests under the rear of the ball
-  // (siblings use ~0.03 nest — the old Math.max(0.05, R*0.65+…) shoved the skull in front of the neck)
+  // Trunk/neck share joinZ; head sits forward enough that the occiput sits over the neck
+  // column (front still reads nested). Too little nest → nape gap; too much → floating face.
   const joinZ = (hipZ != null ? hipZ : -0.035) * 0.5;
-  const nest = Math.min(0.03, Math.max(0.02, Rball * 0.4));
+  const nest = Math.min(0.05, Math.max(0.028, Rball * 0.52));
   const headZ = joinZ + nest;
   const offsets = {
     ARM_Z: 0.04,

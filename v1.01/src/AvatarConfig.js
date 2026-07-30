@@ -293,26 +293,46 @@ export const HEAD_SCALE_MAX = 2.21;
 export const BROW_STYLES = ["straight", "arched", "thick", "thin", "short", "angled", "none"];
 export const NOSE_STYLES = [
   "button",
+  "soft",
+  "round",
+  "short",
+  "snub",
+  "upturned",
+  "flat",
+  "broad",
+  "flared",
+  "petite",
   "bridge",
   "straight",
-  "flat",
-  "pointy",
   "bulbous",
-  "hooked",
-  "snub",
-  "hawk",
-  "broad",
-  "petite",
-  "slope",
+  "soft-slope",
+  "arched",
+  "pointy",
   "roman",
+  "hooked",
+  "hawk",
+  "slope",
 ];
 export const MOUTH_STYLES = ["smile", "flat", "wide", "small", "none"];
-export const LIP_THICKNESS_MIN = 0.4;
-export const LIP_THICKNESS_MAX = 1.45;
+export const LIP_THICKNESS_MIN = 0.35;
+export const LIP_THICKNESS_MAX = 1.75;
 export const LIP_CURVE_MIN = -1;
 export const LIP_CURVE_MAX = 1;
-export const LIP_LENGTH_MIN = 0.5;
-export const LIP_LENGTH_MAX = 1.35;
+export const LIP_LENGTH_MIN = 0.45;
+export const LIP_LENGTH_MAX = 1.55;
+/** Natural lip tones (random picks stay in this band). */
+export const LIP_COLORS = [
+  0xc47880, // soft rose
+  0xb56a72, // dusty rose
+  0xa85c68, // muted mauve
+  0xd08a8a, // light coral
+  0x9a5a5a, // brown-rose
+  0xc48a78, // peach nude
+  0x8a4a52, // deeper rose
+  0xb87870, // warm nude
+];
+export const NOSE_SCALE_MIN = 0.45;
+export const NOSE_SCALE_MAX = 1.35;
 export const BROW_LENGTH_MIN = 0.5;
 export const BROW_LENGTH_MAX = 1.75;
 export const EAR_STYLES = [
@@ -411,7 +431,14 @@ export const DEFAULT_CONFIG = Object.freeze({
   },
   brows: { style: "straight", scale: 0.62, length: 0.72 },
   nose: { style: "button", scale: 0.78, width: 0.9 },
-  mouth: { style: "smile", scale: 0.62, lipThickness: 0.7, curvature: 0.45, lipLength: 0.72 },
+  mouth: {
+    style: "smile",
+    scale: 0.62,
+    lipThickness: 0.7,
+    curvature: 0.45,
+    lipLength: 0.72,
+    color: 0xc47880,
+  },
   ears: { style: "round", scale: 1 },
   hair: { style: "short", color: 0x3a2a1a },
   hat: { style: "none", color: 0x3d8f6e },
@@ -497,6 +524,10 @@ export function resolveConfig(partial = {}) {
     cfg.mouth.lipLength = Number.isFinite(len)
       ? Math.min(LIP_LENGTH_MAX, Math.max(LIP_LENGTH_MIN, len))
       : 1;
+    const ms = Number(cfg.mouth.scale);
+    cfg.mouth.scale = Number.isFinite(ms) ? Math.min(1.55, Math.max(0.45, ms)) : 0.62;
+    const mc = Number(cfg.mouth.color);
+    cfg.mouth.color = Number.isFinite(mc) ? mc & 0xffffff : 0xc47880;
   }
   if (cfg.brows) {
     const bl = Number(cfg.brows.length);
@@ -506,11 +537,14 @@ export function resolveConfig(partial = {}) {
   }
   if (cfg.nose) {
     const ns = Number(cfg.nose.scale);
-    cfg.nose.scale = Number.isFinite(ns) ? Math.min(2, Math.max(0.35, ns)) : 0.78;
+    cfg.nose.scale = Number.isFinite(ns)
+      ? Math.min(NOSE_SCALE_MAX, Math.max(NOSE_SCALE_MIN, ns))
+      : 0.78;
     const nw = Number(cfg.nose.width);
     cfg.nose.width = Number.isFinite(nw)
       ? Math.min(NOSE_WIDTH_MAX, Math.max(NOSE_WIDTH_MIN, nw))
       : 0.9;
+    if (cfg.nose.style && !NOSE_STYLES.includes(cfg.nose.style)) cfg.nose.style = "button";
   }
   return cfg;
 }
@@ -594,16 +628,22 @@ export function randomConfig(seed = Math.random()) {
       length: BROW_LENGTH_MIN + rnd() * (BROW_LENGTH_MAX - BROW_LENGTH_MIN),
     },
     nose: {
-      style: pick(NOSE_STYLES),
-      scale: 0.55 + rnd() * 0.55,
+      // Bias toward soft everyday shapes; long/pointy IDs still exist but are toned down
+      style: pick([
+        "button", "soft", "round", "short", "snub", "upturned", "flat", "broad", "flared",
+        "petite", "bridge", "straight", "bulbous", "soft-slope", "arched",
+        "pointy", "roman", "button", "soft", "round",
+      ]),
+      scale: NOSE_SCALE_MIN + rnd() * (NOSE_SCALE_MAX - NOSE_SCALE_MIN),
       width: NOSE_WIDTH_MIN + rnd() * (NOSE_WIDTH_MAX - NOSE_WIDTH_MIN),
     },
     mouth: {
       style: pick(MOUTH_STYLES.filter((s) => s !== "none")),
-      scale: 0.9 + rnd() * 0.3,
+      scale: 0.55 + rnd() * 0.75,
       lipThickness: LIP_THICKNESS_MIN + rnd() * (LIP_THICKNESS_MAX - LIP_THICKNESS_MIN),
       curvature: LIP_CURVE_MIN + rnd() * (LIP_CURVE_MAX - LIP_CURVE_MIN),
       lipLength: LIP_LENGTH_MIN + rnd() * (LIP_LENGTH_MAX - LIP_LENGTH_MIN),
+      color: pick(LIP_COLORS),
     },
     ears: { style: "round", scale: 1 },
     hair: { style: pick(hairPool), color: pick([0x1a1a1a, 0x3a2a1a, 0x6a4a2a, 0xc4a35a, 0x8a2a2a, 0x4a4a5a]) },
