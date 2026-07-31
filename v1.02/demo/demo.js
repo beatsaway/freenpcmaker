@@ -58,6 +58,9 @@ import { attachMeshOutline, tickMeshOutline, HAND_FPS } from "../src/materials/g
 import { setPaintFrame } from "../src/materials/imperfectFill.js";
 import { applyHandShadow, setHandShadowFrame } from "../src/materials/handShadow.js";
 
+/** Kick off anim library download immediately (overlaps scene setup). */
+const bootClipsPromise = loadHumanAnimationClips();
+
 const lookCodeEl = document.getElementById("look-code");
 const btnLookCopy = document.getElementById("btn-look-copy");
 const btnLookApply = document.getElementById("btn-look-apply");
@@ -67,11 +70,11 @@ const currentClipCheck = document.getElementById("current-clip-check");
 const currentClipNameEl = document.getElementById("current-clip-name");
 const animSpeedEl = document.getElementById("anim-speed");
 const exportCountEl = document.getElementById("export-count");
-const btnExport = document.getElementById("btn-export");
-const btnExportMesh = document.getElementById("btn-export-mesh");
 const btnExportAll = document.getElementById("btn-export-all");
 const btnExportNone = document.getElementById("btn-export-none");
 const downloadLink = document.getElementById("download-link");
+const dockMenu = document.getElementById("dock-menu");
+const bottomEl = document.getElementById("bottom");
 const animFilter = document.getElementById("anim-filter");
 const animClipsEl = document.getElementById("anim-clips");
 const btnPlay = document.getElementById("btn-play");
@@ -381,18 +384,7 @@ function populateAnimSelect(preferName) {
 
 function updateExportCount() {
   const n = exportSelected.size;
-  exportCountEl.textContent = `${n}`;
-  // Allow click even with 0 checked — we'll offer the currently viewed clip
-  btnExport.disabled = !rigged || exporting;
-  btnExport.title = n
-    ? `Download with ${n} animation${n === 1 ? "" : "s"}`
-    : currentClipName
-      ? `No clips checked — will offer “${currentClipName}”`
-      : "Check clips to include in download";
-  if (btnExportMesh) {
-    btnExportMesh.disabled = !rigged || exporting;
-    btnExportMesh.title = "Download this avatar mesh with rig, but no animation";
-  }
+  if (exportCountEl) exportCountEl.textContent = `${n}`;
   syncCurrentClipRow();
 }
 
@@ -502,8 +494,6 @@ async function exportGlbPackage(opts = {}) {
   }
 
   exporting = true;
-  btnExport.disabled = true;
-  if (btnExportMesh) btnExportMesh.disabled = true;
   setStatus(
     withAnims
       ? `Exporting GLB · ${clips.length} clip${clips.length === 1 ? "" : "s"}…`
@@ -922,19 +912,111 @@ btnExportNone?.addEventListener("click", () => {
   exportSelected.clear();
   refreshAnimClipList();
 });
-btnExport?.addEventListener("click", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  exportGlbPackage({ withAnims: true });
-});
-btnExportMesh?.addEventListener("click", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
+
+function downloadLookGlb() {
+  if (!rigged || exporting) return;
   const ok = window.confirm(
     "You will download this avatar mesh with rig, but no animation.\n\nContinue?"
   );
   if (!ok) return;
   exportGlbPackage({ withAnims: false });
+}
+
+function downloadAnimGlb() {
+  if (!rigged || exporting) return;
+  exportGlbPackage({ withAnims: true });
+}
+
+function activeDockTabId() {
+  return document.querySelector(".dock-tab.active")?.dataset.tab || "code";
+}
+
+function closeDockMenu() {
+  if (!dockMenu || dockMenu.hidden) return;
+  dockMenu.hidden = true;
+  dockMenu.innerHTML = "";
+  for (const btn of document.querySelectorAll(".sum-menu-btn[aria-expanded='true']")) {
+    btn.setAttribute("aria-expanded", "false");
+  }
+}
+
+function openDockMenu(kind, anchor) {
+  if (!dockMenu || !anchor || !bottomEl) return;
+  const alreadyOpen = activeDockTabId() === kind;
+  const canDownload = !!(rigged && !exporting);
+
+  dockMenu.innerHTML = "";
+  if (!alreadyOpen) {
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "dock-menu-item";
+    editBtn.role = "menuitem";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeDockMenu();
+      showDockTab(kind);
+    });
+    dockMenu.appendChild(editBtn);
+  }
+
+  const dlBtn = document.createElement("button");
+  dlBtn.type = "button";
+  dlBtn.className = "dock-menu-item";
+  dlBtn.role = "menuitem";
+  dlBtn.textContent = "Download as GLB";
+  dlBtn.disabled = !canDownload;
+  dlBtn.title = kind === "look"
+    ? "Mesh + rig, no animations"
+    : "Mesh + rig with checked clips";
+  dlBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeDockMenu();
+    if (kind === "look") downloadLookGlb();
+    else downloadAnimGlb();
+  });
+  dockMenu.appendChild(dlBtn);
+
+  dockMenu.hidden = false;
+  for (const btn of document.querySelectorAll(".sum-menu-btn")) {
+    btn.setAttribute("aria-expanded", btn === anchor ? "true" : "false");
+  }
+
+  const bottomRect = bottomEl.getBoundingClientRect();
+  const anchorRect = anchor.getBoundingClientRect();
+  dockMenu.style.left = `${Math.max(6, anchorRect.left - bottomRect.left)}px`;
+  dockMenu.style.bottom = `${bottomRect.bottom - anchorRect.top + 4}px`;
+  dockMenu.style.top = "auto";
+  dockMenu.style.right = "auto";
+
+  // Keep menu on-screen
+  const menuRect = dockMenu.getBoundingClientRect();
+  if (menuRect.right > bottomRect.right - 6) {
+    dockMenu.style.left = `${Math.max(6, bottomRect.width - menuRect.width - 6)}px`;
+  }
+}
+
+for (const btn of document.querySelectorAll(".sum-menu-btn")) {
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const kind = btn.dataset.menu;
+    if (!kind) return;
+    if (!dockMenu?.hidden && btn.getAttribute("aria-expanded") === "true") {
+      closeDockMenu();
+      return;
+    }
+    openDockMenu(kind, btn);
+  });
+}
+
+document.addEventListener("click", (e) => {
+  if (!dockMenu || dockMenu.hidden) return;
+  if (e.target.closest("#dock-menu") || e.target.closest(".sum-menu-btn")) return;
+  closeDockMenu();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeDockMenu();
 });
 
 btnLookCopy?.addEventListener("click", async () => {
@@ -1022,6 +1104,7 @@ buildLookControls();
 
 /** Bottom dock: only one of Look / Animation / Genes open at a time. */
 function showDockTab(tabId) {
+  closeDockMenu();
   const tabs = [...document.querySelectorAll(".dock-tab[data-tab]")];
   const panes = {
     look: document.getElementById("pane-look"),
@@ -1039,15 +1122,15 @@ function showDockTab(tabId) {
   }
 }
 
-for (const tab of document.querySelectorAll(".dock-tab[data-tab]")) {
+for (const tab of document.querySelectorAll(".dock-tab[data-tab='code']")) {
   tab.addEventListener("click", (e) => {
-    if (e.target.closest("button")) return; // spark / download keep their own handlers
-    showDockTab(tab.dataset.tab);
+    if (e.target.closest("button")) return; // Lucky Roll keeps its handler
+    showDockTab("code");
   });
   tab.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      showDockTab(tab.dataset.tab);
+      showDockTab("code");
     }
   });
 }
@@ -1059,11 +1142,35 @@ document.getElementById("btn-about")?.addEventListener("click", () => {
 });
 
 const splash = document.getElementById("splash");
+const splashHint = splash?.querySelector(".splash-hint");
+let bootReady = false;
+let startQueued = false;
+
+function setSplashHint(text) {
+  if (splashHint) splashHint.textContent = text;
+}
+
 function startApp() {
   if (!splash || splash.classList.contains("is-done")) return;
+  if (!bootReady) {
+    startQueued = true;
+    setSplashHint("Almost ready…");
+    return;
+  }
   splash.classList.add("is-done");
   document.body.classList.remove("prestart");
+  // Ensure canvas matches viewport after becoming visible
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
 }
+
+function markBootReady() {
+  bootReady = true;
+  setSplashHint("Tap to start");
+  if (startQueued) startApp();
+}
+
 splash?.addEventListener("click", startApp);
 splash?.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") {
@@ -1072,14 +1179,21 @@ splash?.addEventListener("keydown", (e) => {
   }
 });
 
-setStatus("Loading human animation library…");
-loadHumanAnimationClips()
+setSplashHint("Lucky rolling…");
+setStatus("Lucky rolling…");
+bootClipsPromise
   .then((list) => {
     sourceClips = list;
+    setSplashHint("Fitting avatar…");
     setStatus(`Loaded ${list.length} clips — fitting avatar…`);
     pendingAnimPrefer = "random";
     return rebuildRigged();
   })
+  .then(() => {
+    markBootReady();
+  })
   .catch((err) => {
+    setSplashHint("Tap to start");
     setStatus(`Anim load failed: ${err.message || err}`);
+    markBootReady();
   });

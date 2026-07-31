@@ -21,7 +21,7 @@
   <div class="splash-inner">
     <p class="splash-title">Free NPC Maker</p>
     <p class="splash-tag">v1.02 · mesh, texture, rig, animation</p>
-    <p class="splash-hint">Tap to start</p>
+    <p class="splash-hint">Lucky rolling…</p>
   </div>
 </div>
 
@@ -46,17 +46,16 @@
       <span class="sum-label">Genes</span>
       <button type="button" id="btn-random">✦ Lucky Roll</button>
     </div>
-    <div class="dock-tab" role="tab" tabindex="0" data-tab="look" aria-selected="false">
+    <div class="dock-tab" role="tab" data-tab="look" aria-selected="false">
       <button type="button" class="rand-star on sum-star" id="rand-look-mod" title="Include Look in Randomize" aria-label="Toggle Look in Randomize">✦</button>
-      <span class="sum-label">Look</span>
-      <button type="button" class="tiny sum-action" id="btn-export-mesh" disabled title="Download this avatar mesh with rig (no animations)">Download</button>
+      <button type="button" class="sum-label sum-menu-btn" data-menu="look" aria-haspopup="menu" aria-expanded="false">Look</button>
     </div>
-    <div class="dock-tab" role="tab" tabindex="0" data-tab="anim" aria-selected="false">
+    <div class="dock-tab" role="tab" data-tab="anim" aria-selected="false">
       <button type="button" class="rand-star on sum-star" id="rand-anim-mod" title="Include Animation in Randomize" aria-label="Toggle Animation in Randomize">✦</button>
-      <span class="sum-label">Animation</span>
-      <button type="button" class="tiny sum-action" id="btn-export" disabled title="Download with checked clips">Download</button>
+      <button type="button" class="sum-label sum-menu-btn" data-menu="anim" aria-haspopup="menu" aria-expanded="false">Animation</button>
     </div>
   </div>
+  <div id="dock-menu" class="dock-menu" hidden role="menu"></div>
 
   <div class="dock-body">
     <div class="dock-pane" id="pane-code">

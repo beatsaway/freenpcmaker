@@ -58,6 +58,9 @@ import { attachMeshOutline, tickMeshOutline, HAND_FPS } from "../src/materials/g
 import { setPaintFrame } from "../src/materials/imperfectFill.js";
 import { applyHandShadow, setHandShadowFrame } from "../src/materials/handShadow.js";
 
+/** Kick off anim library download immediately (overlaps scene setup). */
+const bootClipsPromise = loadHumanAnimationClips();
+
 const lookCodeEl = document.getElementById("look-code");
 const btnLookCopy = document.getElementById("btn-look-copy");
 const btnLookApply = document.getElementById("btn-look-apply");
@@ -1059,11 +1062,34 @@ document.getElementById("btn-about")?.addEventListener("click", () => {
 });
 
 const splash = document.getElementById("splash");
+const splashHint = splash?.querySelector(".splash-hint");
+let bootReady = false;
+let startQueued = false;
+
+function setSplashHint(text) {
+  if (splashHint) splashHint.textContent = text;
+}
+
 function startApp() {
   if (!splash || splash.classList.contains("is-done")) return;
+  if (!bootReady) {
+    startQueued = true;
+    setSplashHint("Almost ready…");
+    return;
+  }
   splash.classList.add("is-done");
   document.body.classList.remove("prestart");
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
 }
+
+function markBootReady() {
+  bootReady = true;
+  setSplashHint("Tap to start");
+  if (startQueued) startApp();
+}
+
 splash?.addEventListener("click", startApp);
 splash?.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") {
@@ -1072,14 +1098,21 @@ splash?.addEventListener("keydown", (e) => {
   }
 });
 
-setStatus("Loading human animation library…");
-loadHumanAnimationClips()
+setSplashHint("Lucky rolling…");
+setStatus("Lucky rolling…");
+bootClipsPromise
   .then((list) => {
     sourceClips = list;
+    setSplashHint("Fitting avatar…");
     setStatus(`Loaded ${list.length} clips — fitting avatar…`);
     pendingAnimPrefer = "random";
     return rebuildRigged();
   })
+  .then(() => {
+    markBootReady();
+  })
   .catch((err) => {
+    setSplashHint("Tap to start");
     setStatus(`Anim load failed: ${err.message || err}`);
+    markBootReady();
   });
