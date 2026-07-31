@@ -544,6 +544,8 @@ export function resolveConfig(partial = {}) {
     cfg.nose.width = Number.isFinite(nw)
       ? Math.min(NOSE_WIDTH_MAX, Math.max(NOSE_WIDTH_MIN, nw))
       : 1.05;
+    if (cfg.nose.style && !NOSE_STYLES.includes(cfg.nose.style)) cfg.nose.style = "button";
+  }
   return cfg;
 }
 

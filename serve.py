@@ -1,5 +1,5 @@
 """
-Hub server for Free NPC Maker — launch page + versioned apps (v1.0 / v1.01).
+Hub server for Free NPC Maker — launch page + versioned apps (v1.0 / v1.01 / v1.02).
 Maps /animations and /rigs from each version's ./static (Vite publicDir convention).
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parent
 PORT = int(os.environ.get("PORT", "8770"))
-VERSIONS = ("v1.0", "v1.01")
+VERSIONS = ("v1.0", "v1.01", "v1.02")
 
 mimetypes.add_type("text/javascript", ".js")
 mimetypes.add_type("application/wasm", ".wasm")
@@ -34,7 +34,7 @@ class Handler(SimpleHTTPRequestHandler):
     def translate_path(self, path: str) -> str:
         clean = unquote(path.split("?", 1)[0].split("#", 1)[0])
 
-        m = re.match(r"^/(v1\.0|v1\.01)(/.*)?$", clean)
+        m = re.match(r"^/(v1\.0|v1\.01|v1\.02)(/.*)?$", clean)
         if m:
             ver = m.group(1)
             rest = (m.group(2) or "/").lstrip("/")
@@ -52,7 +52,7 @@ class Handler(SimpleHTTPRequestHandler):
             return str(target)
 
         if clean.startswith("/animations/") or clean.startswith("/rigs/"):
-            ver = self._version_from_referer() or "v1.01"
+            ver = self._version_from_referer() or "v1.02"
             return str(ROOT / ver / "static" / clean.lstrip("/").replace("/", os.sep))
 
         return super().translate_path(path)
@@ -65,7 +65,7 @@ class Handler(SimpleHTTPRequestHandler):
 def main() -> None:
     httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     print(f"Free NPC Maker — http://127.0.0.1:{PORT}/")
-    print("  v1.01 (latest) · v1.0")
+    print("  v1.02 (latest) · v1.01 · v1.0")
     print("Ctrl+C to stop.")
     try:
         httpd.serve_forever()
