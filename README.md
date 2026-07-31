@@ -4,7 +4,8 @@ Version hub — pick a build from the launch page.
 
 | Folder | Version | Notes |
 |--------|---------|--------|
-| `v1.01/` | **latest** | Current build (face seating, neck join, skull-safe hair) |
+| `v1.02/` | **latest** | SDF clothes (v1.0 approach), ears, fuller/wider nose |
+| `v1.01/` | previous | Face seating, neck join, skull-safe hair |
 | `v1.0/` | classic | Original push release |
 
 ## Run

@@ -7,7 +7,7 @@ set URL=http://127.0.0.1:%PORT%/
 
 echo.
 echo === Free NPC Maker ===
-echo Versions: v1.01 (latest) · v1.0
+echo Versions: v1.02 (latest) · v1.01 · v1.0
 echo Lean local server (Python + Three.js CDN — no npm)
 echo Freeing port %PORT% ...
 
