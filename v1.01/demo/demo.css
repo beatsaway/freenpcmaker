@@ -246,6 +246,22 @@ canvas {
   flex: 0 0 auto;
   white-space: nowrap;
 }
+.dock-tab .sum-menu-btn {
+  font: inherit;
+  font-family: Orbitron, sans-serif;
+  font-size: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  line-height: 1;
+}
+.dock-tab .sum-menu-btn:hover {
+  color: var(--ink);
+}
 .dock-tab .sum-star {
   flex: 0 0 auto;
   width: auto;
@@ -263,10 +279,36 @@ canvas {
   border: none;
   background: transparent;
 }
-.dock-tab .sum-action {
-  flex: 0 0 auto;
-  margin-left: 4px;
-  padding: 2px 5px;
+
+.dock-menu {
+  position: absolute;
+  z-index: 50;
+  min-width: 132px;
+  padding: 3px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 0 6px 18px rgba(40, 30, 10, 0.14);
+}
+.dock-menu[hidden] { display: none !important; }
+.dock-menu .dock-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: Orbitron, sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  padding: 7px 9px;
+  margin: 0;
+}
+.dock-menu .dock-menu-item:hover:not(:disabled) {
+  background: #f3efe6;
+}
+.dock-menu .dock-menu-item:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .dock-body {
