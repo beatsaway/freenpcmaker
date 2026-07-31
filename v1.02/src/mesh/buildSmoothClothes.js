@@ -1,6 +1,6 @@
 /**
- * Full clothing shells via SDF → marching cubes (tops, bottoms, hood).
- * Slightly padded over the body so garments read as real cloth volumes.
+ * Clothing shells via SDF → marching cubes (torso / hip / hood).
+ * Limbs are lathe tubes on the body arm/leg path (see buildLatheLimbCloth.js).
  */
 import * as THREE from "three";
 import {
@@ -119,7 +119,11 @@ export function buildSmoothTop(mat, opts = {}) {
 
   const longSleeve = style === "hoodie" || style === "jacket";
   const shortSleeve = style === "tee" || style === "polo";
-  const sleeveLen = longSleeve ? L.armLenU + L.armLenL * 0.85 : shortSleeve ? L.armLenU * 0.55 : 0;
+  // Hybrid: lathe sleeves are added separately — SDF is torso (+ soft deltoid caps) only
+  const includeSleeves = opts.includeSleeves === true;
+  const sleeveLen = includeSleeves
+    ? (longSleeve ? L.armLenU + L.armLenL * 0.85 : shortSleeve ? L.armLenU * 0.55 : 0)
+    : 0;
   // Hem above waist (overalls = short bib top like former tank)
   const yHem =
     style === "overalls" ? L.yWaist + 0.05
@@ -131,9 +135,9 @@ export function buildSmoothTop(mat, opts = {}) {
   function sdf(px, py, pz) {
     let d = sdTorsoShell(px, py, pz, L, yHem, yNeckline, pad);
 
-    // Soft shoulder caps
-    d = smin(d, sdSphere(px, py, pz, L.shoulderX, L.yShoulder, 0, L.rShoulder + pad), k);
-    d = smin(d, sdSphere(px, py, pz, -L.shoulderX, L.yShoulder, 0, L.rShoulder + pad), k);
+    // Soft deltoid caps — bridge torso SDF to lathe sleeve roots
+    d = smin(d, sdSphere(px, py, pz, L.shoulderX, L.yShoulder, 0.04, L.rShoulder + pad * 0.85), k);
+    d = smin(d, sdSphere(px, py, pz, -L.shoulderX, L.yShoulder, 0.04, L.rShoulder + pad * 0.85), k);
 
     if (sleeveLen > 0) {
       const rPad = pad + (longSleeve ? 0.012 : 0.008);
@@ -187,7 +191,9 @@ export function buildSmoothTop(mat, opts = {}) {
     return d - 0.004;
   }
 
-  const armReach = L.shoulderX + (sleeveLen || 0.08) + 0.08;
+  const armReach = includeSleeves
+    ? L.shoulderX + (sleeveLen || 0.08) + 0.08
+    : L.shoulderX + L.rShoulder + pad + 0.06;
   const x0 = -armReach;
   const x1 = armReach;
   const y0 = yHem - 0.06;
@@ -229,12 +235,16 @@ export function buildSmoothBottom(mat, opts = {}) {
   const k = 0.04;
   const yTop = opts.yTop ?? L.yWaist - 0.04;
   const isShorts = style === "shorts" || style === "mini-shorts";
-  const yBot = isShorts
+  const yBotFull = isShorts
     ? (opts.yBot ?? (style === "mini-shorts" ? L.yHip - 0.06 : (L.yHip + L.yKnee) * 0.55))
     : (opts.yBot ?? L.yAnkle + 0.04);
+  // Hybrid: lathe legs are separate — SDF is hip / crotch shell only
+  const includeLegs = opts.includeLegs === true;
+  const yBot = includeLegs ? yBotFull : Math.max(yBotFull, L.yHip - (isShorts ? 0.1 : 0.14));
   const rPad = 0.016;
   const waistY = mix(L.yHip, L.yWaist, 0.65);
   const kCrotch = 0.085;
+  const legZ = opts.legZ ?? 0;
 
   function sdf(px, py, pz) {
     let d = sdEllipsoid(px, py, pz, 0, waistY, 0, L.waistRX + 0.028, 0.048, L.waistRZ + 0.022);
@@ -251,23 +261,30 @@ export function buildSmoothBottom(mat, opts = {}) {
       kCrotch
     );
 
-    const legTop = L.yHip - 0.02;
-    const kneeY = isShorts ? yBot + 0.02 : L.yKnee;
-    let dLegs = Math.min(
-      sdCapsule(px, py, pz, L.legX, legTop, 0, L.legX, kneeY, 0, L.rThigh + rPad),
-      sdCapsule(px, py, pz, -L.legX, legTop, 0, -L.legX, kneeY, 0, L.rThigh + rPad)
-    );
-    d = smin(d, dLegs, kCrotch);
-
-    if (style === "pants") {
-      d = smin(d, sdCapsule(px, py, pz, L.legX, L.yKnee, 0, L.legX, yBot, 0, L.rCalf + rPad), k);
-      d = smin(d, sdCapsule(px, py, pz, -L.legX, L.yKnee, 0, -L.legX, yBot, 0, L.rCalf + rPad), k);
-      d = smin(d, sdSphere(px, py, pz, L.legX, yBot, 0, L.rAnkle + 0.018), k * 0.8);
-      d = smin(d, sdSphere(px, py, pz, -L.legX, yBot, 0, L.rAnkle + 0.018), k * 0.8);
+    // Soft thigh roots so lathe pant legs nest into the hip shell
+    if (!includeLegs) {
+      const rootY = mix(L.yHip, yBot, 0.35);
+      d = smin(d, sdSphere(px, py, pz, L.legX, rootY, legZ, L.rThigh + rPad * 1.1), kCrotch);
+      d = smin(d, sdSphere(px, py, pz, -L.legX, rootY, legZ, L.rThigh + rPad * 1.1), kCrotch);
     } else {
-      const hemR = style === "mini-shorts" ? L.rThigh * 0.95 : L.rThigh * 0.85;
-      d = smin(d, sdSphere(px, py, pz, L.legX, yBot, 0, hemR), k * 0.8);
-      d = smin(d, sdSphere(px, py, pz, -L.legX, yBot, 0, hemR), k * 0.8);
+      const legTop = L.yHip - 0.02;
+      const kneeY = isShorts ? yBot + 0.02 : L.yKnee;
+      let dLegs = Math.min(
+        sdCapsule(px, py, pz, L.legX, legTop, 0, L.legX, kneeY, 0, L.rThigh + rPad),
+        sdCapsule(px, py, pz, -L.legX, legTop, 0, -L.legX, kneeY, 0, L.rThigh + rPad)
+      );
+      d = smin(d, dLegs, kCrotch);
+
+      if (style === "pants") {
+        d = smin(d, sdCapsule(px, py, pz, L.legX, L.yKnee, 0, L.legX, yBot, 0, L.rCalf + rPad), k);
+        d = smin(d, sdCapsule(px, py, pz, -L.legX, L.yKnee, 0, -L.legX, yBot, 0, L.rCalf + rPad), k);
+        d = smin(d, sdSphere(px, py, pz, L.legX, yBot, 0, L.rAnkle + 0.018), k * 0.8);
+        d = smin(d, sdSphere(px, py, pz, -L.legX, yBot, 0, L.rAnkle + 0.018), k * 0.8);
+      } else {
+        const hemR = style === "mini-shorts" ? L.rThigh * 0.95 : L.rThigh * 0.85;
+        d = smin(d, sdSphere(px, py, pz, L.legX, yBot, 0, hemR), k * 0.8);
+        d = smin(d, sdSphere(px, py, pz, -L.legX, yBot, 0, hemR), k * 0.8);
+      }
     }
 
     d = smax(d, pz - (L.hipRZ * 0.55 + 0.02), 0.025);
@@ -287,7 +304,7 @@ export function buildSmoothBottom(mat, opts = {}) {
       z0: -hipD * 0.7 - pad,
       z1: hipD * 0.55 + pad,
     },
-    { x: res, y: style === "pants" ? res + 8 : res, z: res },
+    { x: res, y: includeLegs && style === "pants" ? res + 8 : res, z: res },
     { smoothIters: 5, smoothStrength: 0.7 }
   );
   return finish(geo, mat, "bottom", { cloth: style });

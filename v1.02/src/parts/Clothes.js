@@ -3,6 +3,8 @@ import { buildStack, roundBoxMesh, skullSize } from "./Primitives.js";
 import { clothMaterial } from "../materials/PatternFactory.js";
 import { buildSmoothTop, buildSmoothBottom } from "../mesh/buildSmoothClothes.js";
 import { buildSmoothShoes } from "../mesh/buildSmoothShoes.js";
+import { buildLatheSleeves, buildLathePantLegs } from "../mesh/buildLatheLimbCloth.js";
+import { clothLegPath } from "../mesh/limbPath.js";
 
 function clampButtonCount(n) {
   const v = Math.round(Number(n));
@@ -50,8 +52,8 @@ function accentZ(st, y, depth, embed = 0.002) {
 }
 
 /**
- * Full clothing shells via SDF (v1.0 approach) on the v1.01 body stack.
- * Polo/jacket keep small collar/button accents seated on the shell front.
+ * Hybrid clothes: SDF torso/hip shells + lathe sleeves/pant legs on the
+ * same limb paths as buildLatheBody.
  */
 export class Clothes {
   static build(cfg) {
@@ -82,6 +84,7 @@ export class Clothes {
     const style = bottom.style || "pants";
     const mat = clothMaterial(bottom.color ?? 0x3a4550, bottom.pattern || {});
     const st = buildStack(cfg);
+    const legPath = clothLegPath(st);
 
     let yTop = st.waistY ?? st.hip.top;
     let yBot = st.shin.bot + 0.02;
@@ -107,8 +110,13 @@ export class Clothes {
       yBot,
       layout: st.L,
       legScale: st.H?.leg ?? 1,
+      includeLegs: false,
+      legZ: legPath.z,
     });
     if (mesh) g.add(mesh);
+
+    const legs = buildLathePantLegs(mat, st, { style, yBot });
+    if (legs) g.add(legs);
     return g;
   }
 
@@ -151,8 +159,12 @@ export class Clothes {
       neckY: st.neck.y,
       neckBot: st.neck.bot,
       layout: st.L,
+      includeSleeves: false,
     });
     if (mesh) g.add(mesh);
+
+    const sleeves = buildLatheSleeves(topMat, st, style);
+    if (sleeves) g.add(sleeves);
 
     if (style === "polo") {
       const collar = clothMaterial(top.pattern?.color2 ?? 0xffffff, { type: "solid" });
